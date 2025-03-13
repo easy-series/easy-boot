@@ -6,7 +6,6 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="easy-cache" />
       </profile>
       <profile name="Annotation profile for easy-boot" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -18,9 +17,10 @@
           <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct-processor/1.6.3/mapstruct-processor-1.6.3.jar" />
           <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct/1.6.3/mapstruct-1.6.3.jar" />
         </processorPath>
-        <module name="easy-common" />
         <module name="easy-id" />
         <module name="easy-lock" />
+        <module name="easy-cache" />
+        <module name="easy-common" />
       </profile>
     </annotationProcessing>
   </component>
