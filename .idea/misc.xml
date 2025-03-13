@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="MavenProjectsManager">
+    <option name="originalFiles">
+      <list>
+        <option value="$PROJECT_DIR$/pom.xml" />
+        <option value="$PROJECT_DIR$/easy-framework/pom.xml" />
+        <option value="$PROJECT_DIR$/easy-framework/easy-id/pom.xml" />
+        <option value="$PROJECT_DIR$/easy-framework/easy-cache/pom.xml" />
+        <option value="$PROJECT_DIR$/easy-framework/easy-common/pom.xml" />
+        <option value="$PROJECT_DIR$/easy-dependencies/pom.xml" />
+      </list>
+    </option>
+    <option name="ignoredFiles">
+      <set>
+        <option value="$PROJECT_DIR$/easy-framework/yudao-spring-boot-starter-redis/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-biz-data-permission/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-biz-ip/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-biz-tenant/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-excel/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-job/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-monitor/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-mq/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-mybatis/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-protection/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-security/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-web/pom.xml" />
+        <option value="$PROJECT_DIR$/yudao-framework/yudao-spring-boot-starter-websocket/pom.xml" />
+      </set>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_17" default="true" project-jdk-name="corretto-17" project-jdk-type="JavaSDK" />
+</project>
