@@ -8,14 +8,14 @@ public enum CacheType {
      * 本地缓存
      */
     LOCAL,
-
+    
     /**
-     * 远程缓存（Redis）
+     * Redis缓存
      */
-    REMOTE,
-
+    REDIS,
+    
     /**
-     * 两级缓存（本地+远程）
+     * 两级缓存(本地+Redis)
      */
-    BOTH
+    TWO_LEVEL
 } 

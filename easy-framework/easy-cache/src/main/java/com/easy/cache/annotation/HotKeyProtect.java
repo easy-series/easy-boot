@@ -3,25 +3,25 @@ package com.easy.cache.annotation;
 import java.lang.annotation.*;
 
 /**
- * 热点数据保护注解，用于防止缓存击穿
+ * 启用热点键保护
  */
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface HotKeyProtect {
     
     /**
-     * 访问阈值，超过该阈值会触发保护机制
+     * 热点Key检测阈值，默认1秒内请求5次认为是热点
      */
-    int threshold() default 1000;
+    int threshold() default 5;
     
     /**
-     * 时间窗口（秒），在该时间窗口内统计访问次数
+     * 检测时间窗口(毫秒)
      */
-    long timeWindow() default 60;
+    long windowInMillis() default 1000;
     
     /**
-     * 本地缓存过期时间（秒），热点数据会在本地缓存中保存更长时间
+     * 热点Key的本地缓存时间(秒)
      */
-    long localExpire() default 300;
+    int localCacheSeconds() default 5;
 } 

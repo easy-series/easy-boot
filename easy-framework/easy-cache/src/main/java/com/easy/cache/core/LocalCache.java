@@ -1,123 +1,81 @@
 package com.easy.cache.core;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
+import com.github.benmanes.caffeine.cache.Caffeine;
+
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 基于内存的本地缓存实现
+ * 本地缓存实现，基于Caffeine Cache
+ *
+ * @param <K> 键类型
+ * @param <V> 值类型
  */
 public class LocalCache<K, V> extends AbstractCache<K, V> {
 
-    private final Map<K, CacheEntry<V>> cache = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService executor;
-    private final AtomicLong hitCount = new AtomicLong(0);
-    private final AtomicLong missCount = new AtomicLong(0);
+    /**
+     * Caffeine缓存实例
+     */
+    private final com.github.benmanes.caffeine.cache.Cache<K, V> cache;
 
-    public LocalCache(String name) {
+    /**
+     * 构造函数
+     *
+     * @param name 缓存名称
+     * @param initialCapacity 初始容量
+     * @param maximumSize 最大容量
+     * @param expireAfterWrite 写入后过期时间
+     * @param timeUnit 时间单位
+     */
+    public LocalCache(String name, int initialCapacity, long maximumSize, long expireAfterWrite, TimeUnit timeUnit) {
         super(name);
-        this.executor = new ScheduledThreadPoolExecutor(1, r -> {
-            Thread thread = new Thread(r, "LocalCache-Expiry-" + name);
-            thread.setDaemon(true);
-            return thread;
-        });
 
-        // 定期清理过期缓存
-        this.executor.scheduleWithFixedDelay(this::cleanExpiredEntries, 10, 10, TimeUnit.SECONDS);
+        Caffeine<Object, Object> builder = Caffeine.newBuilder()
+                .initialCapacity(initialCapacity)
+                .maximumSize(maximumSize);
+
+        if (expireAfterWrite > 0) {
+            builder.expireAfterWrite(expireAfterWrite, timeUnit);
+        }
+
+        this.cache = builder.build();
+    }
+
+    /**
+     * 简单构造函数
+     *
+     * @param name 缓存名称
+     */
+    public LocalCache(String name) {
+        this(name, 100, 10000, 30, TimeUnit.MINUTES);
     }
 
     @Override
     public V get(K key) {
-        checkKey(key);
-        CacheEntry<V> entry = cache.get(key);
-
-        if (entry == null) {
-            missCount.incrementAndGet();
-            return null;
-        }
-
-        if (entry.isExpired()) {
-            cache.remove(key);
-            missCount.incrementAndGet();
-            return null;
-        }
-
-        hitCount.incrementAndGet();
-        return entry.getValue();
+        return cache.getIfPresent(key);
     }
 
     @Override
-    public void put(K key, V value, long expireTime, TimeUnit timeUnit) {
-        checkKey(key);
-        if (value == null) {
-            return;
-        }
-
-        long expireTimeMillis = expireTime <= 0 ? 0 : System.currentTimeMillis() + timeUnit.toMillis(expireTime);
-        cache.put(key, new CacheEntry<>(value, expireTimeMillis));
+    public void put(K key, V value, long expire, TimeUnit timeUnit) {
+        cache.put(key, value);
     }
 
     @Override
     public boolean remove(K key) {
-        checkKey(key);
-        return cache.remove(key) != null;
+        V previous = cache.getIfPresent(key);
+        if (previous != null) {
+            cache.invalidate(key);
+            return true;
+        }
+        return false;
     }
 
     @Override
     public void clear() {
-        cache.clear();
+        cache.invalidateAll();
     }
 
-    /**
-     * 获取缓存命中率
-     */
-    public double getHitRate() {
-        long hits = hitCount.get();
-        long total = hits + missCount.get();
-        return total == 0 ? 0 : (double) hits / total;
+    @Override
+    public long size() {
+        return cache.estimatedSize();
     }
-
-    /**
-     * 获取缓存大小
-     */
-    public int size() {
-        return cache.size();
-    }
-
-    /**
-     * 清理过期缓存项
-     */
-    private void cleanExpiredEntries() {
-        long now = System.currentTimeMillis();
-        cache.entrySet()
-                .removeIf(entry -> entry.getValue().getExpireTime() > 0 && entry.getValue().getExpireTime() <= now);
-    }
-
-    /**
-     * 缓存项，包含值和过期时间
-     */
-    private static class CacheEntry<V> {
-        private final V value;
-        private final long expireTime;
-
-        public CacheEntry(V value, long expireTime) {
-            this.value = value;
-            this.expireTime = expireTime;
-        }
-
-        public V getValue() {
-            return value;
-        }
-
-        public long getExpireTime() {
-            return expireTime;
-        }
-
-        public boolean isExpired() {
-            return expireTime > 0 && System.currentTimeMillis() > expireTime;
-        }
-    }
-}
+} 

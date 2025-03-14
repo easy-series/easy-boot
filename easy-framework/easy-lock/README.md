@@ -17,7 +17,7 @@
 
 ```xml
 <dependency>
-    <groupId>cn.iocoder.boot</groupId>
+    <groupId>com.easy</groupId>
     <artifactId>easy-lock</artifactId>
     <version>${version}</version>
 </dependency>
@@ -33,7 +33,18 @@ spring:
     database: 0
 ```
 
-### 3. 使用注解
+### 3. 配置分布式锁 (可选)
+
+```yaml
+easy:
+  lock:
+    enabled: true
+    key-prefix: easy:lock:
+    default-wait-time: 3000
+    default-lease-time: 30000
+```
+
+### 4. 使用注解
 
 简单使用：
 

@@ -1,356 +1,359 @@
 package com.easy.cache.core;
 
-import com.easy.cache.core.RedisCache.Serializer;
-import com.easy.cache.sync.CacheSyncManager;
+import com.easy.cache.config.CacheProperties;
+import com.easy.cache.event.CacheSyncManager;
+import com.easy.cache.serializer.JdkSerializer;
+import com.easy.cache.serializer.JsonSerializer;
+import com.easy.cache.serializer.Serializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 缓存管理器，用于创建和管理缓存实例
+ * 缓存管理器，负责管理所有缓存实例
  */
 public class CacheManager {
 
-    private static final CacheManager INSTANCE = new CacheManager();
+    private static final Logger logger = LoggerFactory.getLogger(CacheManager.class);
 
+    /**
+     * 缓存属性配置
+     */
+    private final CacheProperties cacheProperties;
+
+    /**
+     * Redis模板
+     */
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    /**
+     * 缓存同步管理器
+     */
+    private CacheSyncManager syncManager;
+
+    /**
+     * 缓存映射表
+     */
     private final Map<String, Cache<?, ?>> caches = new ConcurrentHashMap<>();
-    private RedisTemplate<String, Object> redisTemplate;
+
+    /**
+     * 本地缓存初始容量
+     */
+    private int localInitialCapacity = 100;
+
+    /**
+     * 本地缓存最大容量
+     */
+    private long localMaximumSize = 10000;
+
+    /**
+     * 本地缓存过期时间
+     */
+    private long localExpireAfterWrite = 30;
+
+    /**
+     * 本地缓存时间单位
+     */
+    private TimeUnit localTimeUnit = TimeUnit.MINUTES;
+
+    /**
+     * Redis缓存过期时间
+     */
+    private long redisExpireAfterWrite = 60;
+
+    /**
+     * Redis缓存时间单位
+     */
+    private TimeUnit redisTimeUnit = TimeUnit.MINUTES;
+
+    /**
+     * 序列化器类型
+     */
+    private String serializerType = "JDK";
+
+    /**
+     * 自定义序列化器
+     */
     private Serializer serializer;
 
-    private CacheManager() {
-    }
+    /**
+     * 是否写穿透
+     */
+    private boolean writeThrough = true;
 
     /**
-     * 获取缓存管理器实例
+     * 是否异步写入
      */
-    public static CacheManager getInstance() {
-        return INSTANCE;
-    }
+    private boolean asyncWrite = false;
 
     /**
-     * 设置Redis模板
+     * 是否使用加密
      */
-    public void setRedisTemplate(RedisTemplate<String, Object> redisTemplate) {
+    private boolean encrypted = false;
+
+    /**
+     * 加密密钥
+     */
+    private String encryptionKey;
+    
+    /**
+     * 是否启用缓存同步
+     */
+    private boolean syncEnabled = false;
+
+    /**
+     * 构造函数
+     *
+     * @param cacheProperties 缓存属性配置
+     * @param redisTemplate   Redis模板
+     */
+    public CacheManager(CacheProperties cacheProperties, RedisTemplate<String, Object> redisTemplate) {
+        this.cacheProperties = cacheProperties;
         this.redisTemplate = redisTemplate;
+
+        // 初始化本地缓存配置
+        this.localInitialCapacity = cacheProperties.getLocal().getInitialCapacity();
+        this.localMaximumSize = cacheProperties.getLocal().getMaximumSize();
+        this.localExpireAfterWrite = cacheProperties.getLocal().getExpireAfterWrite();
+        this.localTimeUnit = cacheProperties.getLocal().getTimeUnit();
+
+        // 初始化Redis缓存配置
+        this.redisExpireAfterWrite = cacheProperties.getRedis().getExpireAfterWrite();
+        this.redisTimeUnit = cacheProperties.getRedis().getTimeUnit();
+        this.serializerType = cacheProperties.getRedis().getSerializer();
+
+        // 初始化多级缓存配置
+        this.writeThrough = cacheProperties.getMultiLevel().isWriteThrough();
+        this.asyncWrite = cacheProperties.getMultiLevel().isAsyncWrite();
+        
+        // 初始化缓存同步配置
+        this.syncEnabled = cacheProperties.getSync().isEnabled();
+    }
+
+    /**
+     * 获取指定名称的缓存
+     *
+     * @param <K>      键类型
+     * @param <V>      值类型
+     * @param name     缓存名称
+     * @param cacheType 缓存类型
+     * @return 缓存实例
+     */
+    @SuppressWarnings("unchecked")
+    public <K, V> Cache<K, V> getCache(String name, CacheType cacheType) {
+        Cache<K, V> cache = (Cache<K, V>) caches.get(name);
+        
+        if (cache == null) {
+            synchronized (caches) {
+                cache = (Cache<K, V>) caches.get(name);
+                
+                if (cache == null) {
+                    // 创建新的缓存实例
+                    cache = createCache(name, cacheType);
+                    caches.put(name, cache);
+                    logger.info("Created new cache: {} of type: {}", name, cacheType);
+                }
+            }
+        }
+        
+        return cache;
+    }
+
+    /**
+     * 创建新的缓存实例
+     *
+     * @param <K>      键类型
+     * @param <V>      值类型
+     * @param name     缓存名称
+     * @param cacheType 缓存类型
+     * @return 缓存实例
+     */
+    @SuppressWarnings("unchecked")
+    private <K, V> Cache<K, V> createCache(String name, CacheType cacheType) {
+        CacheBuilder<K, V> builder = CacheBuilder.newBuilder()
+                .name(name)
+                .cacheType(cacheType)
+                .initialCapacity(localInitialCapacity)
+                .maximumSize(localMaximumSize)
+                .expireAfterWrite(
+                        cacheType == CacheType.REDIS ? redisExpireAfterWrite : localExpireAfterWrite,
+                        cacheType == CacheType.REDIS ? redisTimeUnit : localTimeUnit
+                )
+                .writeThrough(writeThrough)
+                .asyncWrite(asyncWrite);
+        
+        // 如果使用Redis或多级缓存，需要设置Redis相关配置
+        if (cacheType == CacheType.REDIS || cacheType == CacheType.TWO_LEVEL) {
+            builder.redisTemplate(redisTemplate);
+            
+            if (serializer != null) {
+                builder.serializer(serializer);
+            } else {
+                builder.serializerType(serializerType);
+            }
+        }
+        
+        // 如果启用加密，设置加密配置
+        if (encrypted && encryptionKey != null && !encryptionKey.isEmpty()) {
+            builder.encrypted(true, encryptionKey);
+        }
+        
+        // 如果启用缓存同步，设置同步配置
+        if (syncEnabled && syncManager != null) {
+            builder.syncEnabled(true, syncManager);
+        }
+        
+        return builder.build();
+    }
+    
+    /**
+     * 设置缓存同步管理器
+     *
+     * @param syncManager 缓存同步管理器
+     */
+    public void setSyncManager(CacheSyncManager syncManager) {
+        this.syncManager = syncManager;
+    }
+
+    // 省略getters和setters方法...
+
+    // 返回缓存数量
+    public int size() {
+        return caches.size();
+    }
+
+    // 清空所有缓存
+    public void clear() {
+        synchronized (caches) {
+            for (Cache<?, ?> cache : caches.values()) {
+                cache.clear();
+            }
+            caches.clear();
+        }
+    }
+
+    // 移除指定名称的缓存
+    public void removeCache(String name) {
+        synchronized (caches) {
+            Cache<?, ?> cache = caches.remove(name);
+            if (cache != null) {
+                cache.clear();
+                logger.info("Removed cache: {}", name);
+            }
+        }
+    }
+
+    /**
+     * 获取序列化器
+     *
+     * @return 序列化器
+     */
+    public Serializer getSerializer() {
+        if (serializer != null) {
+            return serializer;
+        }
+        
+        if ("JSON".equalsIgnoreCase(serializerType)) {
+            return new JsonSerializer();
+        } else {
+            return new JdkSerializer();
+        }
     }
 
     /**
      * 设置序列化器
+     *
+     * @param serializer 序列化器
      */
     public void setSerializer(Serializer serializer) {
         this.serializer = serializer;
     }
 
     /**
-     * 获取Redis模板
-     * 
-     * @return Redis模板
-     */
-    public RedisTemplate<String, Object> getRedisTemplate() {
-        return redisTemplate;
-    }
-
-    /**
-     * 获取序列化器
-     * 
-     * @return 序列化器
-     */
-    public Serializer getSerializer() {
-        return serializer;
-    }
-
-    /**
-     * 创建或获取本地缓存
-     * 
-     * @param name 缓存名称
-     * @return 缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> Cache<K, V> getOrCreateLocalCache(String name) {
-        return (Cache<K, V>) caches.computeIfAbsent(name, k -> new LocalCache<K, V>(name));
-    }
-
-    /**
-     * 创建或获取Redis缓存
-     * 
-     * @param name 缓存名称
-     * @return 缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> Cache<K, V> getOrCreateRedisCache(String name) {
-        if (redisTemplate == null) {
-            throw new IllegalStateException("RedisTemplate is not set");
-        }
-        if (serializer == null) {
-            throw new IllegalStateException("Serializer is not set");
-        }
-
-        return (Cache<K, V>) caches.computeIfAbsent(name + ":redis",
-                k -> new RedisCache<K, V>(name, redisTemplate, serializer));
-    }
-
-    /**
-     * 创建或获取多级缓存
-     * 
-     * @param name         缓存名称
-     * @param writeThrough 是否写透
-     * @param asyncWrite   是否异步写入
-     * @param syncLocal    是否同步本地缓存
-     * @param caches       缓存列表，按照优先级排序
-     * @return 多级缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> Cache<K, V> getOrCreateMultiLevelCache(String name, boolean writeThrough, boolean asyncWrite,
-            boolean syncLocal, Cache<K, V>... caches) {
-        if (caches == null || caches.length == 0) {
-            throw new IllegalArgumentException("Caches cannot be null or empty");
-        }
-
-        List<Cache<K, V>> cacheList = Arrays.asList(caches);
-        return (Cache<K, V>) this.caches.computeIfAbsent(name + ":multi",
-                k -> new MultiLevelCache<K, V>(name, cacheList, writeThrough, asyncWrite, syncLocal));
-    }
-
-    /**
-     * 创建或获取二级缓存（本地缓存 + Redis缓存）
-     * 
-     * @param name         缓存名称
-     * @param writeThrough 是否写透
-     * @param asyncWrite   是否异步写入
-     * @param syncLocal    是否同步本地缓存
-     * @return 二级缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> Cache<K, V> getOrCreateTwoLevelCache(String name, boolean writeThrough, boolean asyncWrite,
-            boolean syncLocal) {
-        if (redisTemplate == null) {
-            throw new IllegalStateException("RedisTemplate is not set");
-        }
-        if (serializer == null) {
-            throw new IllegalStateException("Serializer is not set");
-        }
-
-        Cache<K, V> localCache = getOrCreateLocalCache(name + ":local");
-        Cache<K, V> redisCache = getOrCreateRedisCache(name + ":redis");
-
-        return (Cache<K, V>) this.caches.computeIfAbsent(name + ":two-level",
-                k -> new MultiLevelCache<K, V>(name, Arrays.asList(localCache, redisCache), writeThrough, asyncWrite,
-                        syncLocal));
-    }
-
-    /**
-     * 创建或获取可自动刷新的缓存
-     * 
-     * @param name            缓存名称
-     * @param refreshInterval 刷新间隔
-     * @param refreshTimeUnit 刷新间隔时间单位
-     * @param threadPoolSize  线程池大小
-     * @return 可自动刷新的缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> RefreshableCache<K, V> getOrCreateRefreshableCache(String name, long refreshInterval,
-            TimeUnit refreshTimeUnit, int threadPoolSize) {
-
-        Cache<K, V> baseCache = getOrCreateLocalCache(name + ":base");
-
-        return (RefreshableCache<K, V>) this.caches.computeIfAbsent(name + ":refreshable",
-                k -> new RefreshableCache<K, V>(baseCache, refreshInterval, refreshTimeUnit, threadPoolSize));
-    }
-
-    /**
-     * 创建或获取可自动刷新的Redis缓存
-     * 
-     * @param name            缓存名称
-     * @param refreshInterval 刷新间隔
-     * @param refreshTimeUnit 刷新间隔时间单位
-     * @param threadPoolSize  线程池大小
-     * @return 可自动刷新的Redis缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> RefreshableCache<K, V> getOrCreateRefreshableRedisCache(String name, long refreshInterval,
-            TimeUnit refreshTimeUnit, int threadPoolSize) {
-
-        if (redisTemplate == null) {
-            throw new IllegalStateException("RedisTemplate is not set");
-        }
-        if (serializer == null) {
-            throw new IllegalStateException("Serializer is not set");
-        }
-
-        Cache<K, V> baseCache = getOrCreateRedisCache(name + ":base");
-
-        return (RefreshableCache<K, V>) this.caches.computeIfAbsent(name + ":refreshable-redis",
-                k -> new RefreshableCache<K, V>(baseCache, refreshInterval, refreshTimeUnit, threadPoolSize));
-    }
-
-    /**
-     * 创建或获取可自动刷新的二级缓存（本地缓存 + Redis缓存）
-     * 
-     * @param name            缓存名称
-     * @param refreshInterval 刷新间隔
-     * @param refreshTimeUnit 刷新间隔时间单位
-     * @param threadPoolSize  刷新线程池大小
-     * @param writeThrough    是否写透
-     * @param asyncWrite      是否异步写入
-     * @param syncLocal       是否同步本地缓存
-     * @return 可自动刷新的多级缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> RefreshableCache<K, V> getOrCreateRefreshableTwoLevelCache(String name, long refreshInterval,
-            TimeUnit refreshTimeUnit, int threadPoolSize, boolean writeThrough, boolean asyncWrite, boolean syncLocal) {
-
-        Cache<K, V> baseCache = getOrCreateTwoLevelCache(name + ":base", writeThrough, asyncWrite, syncLocal);
-
-        return (RefreshableCache<K, V>) this.caches.computeIfAbsent(name + ":refreshable-two-level",
-                k -> new RefreshableCache<K, V>(baseCache, refreshInterval, refreshTimeUnit, threadPoolSize));
-    }
-
-    /**
-     * 获取缓存
-     * 
-     * @param name 缓存名称
-     * @return 缓存实例，如果不存在则返回null
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> Cache<K, V> getCache(String name) {
-        return (Cache<K, V>) caches.get(name);
-    }
-
-    /**
-     * 移除缓存
-     * 
-     * @param name 缓存名称
-     * @return 如果缓存存在并被移除则返回true，否则返回false
-     */
-    public boolean removeCache(String name) {
-        Cache<?, ?> cache = caches.remove(name);
-        return cache != null;
-    }
-
-    /**
-     * 清空所有缓存
-     */
-    public void clearAll() {
-        caches.values().forEach(Cache::clear);
-    }
-
-    /**
-     * 根据快速配置创建或获取缓存
-     * 
-     * @param config 快速配置
-     * @return 缓存实例
-     */
-    @SuppressWarnings("unchecked")
-    public <K, V> Cache<K, V> getOrCreateCache(QuickConfig config) {
-        String name = config.getName();
-        QuickConfig.CacheType cacheType = config.getCacheType();
-
-        // 根据缓存类型创建缓存
-        switch (cacheType) {
-            case REMOTE:
-                return getOrCreateRedisCache(name);
-            case BOTH:
-                return getOrCreateTwoLevelCache(name, config.isWriteThrough(), config.isAsyncWrite(),
-                        config.isSyncLocal());
-            case LOCAL:
-            default:
-                Cache<K, V> localCache = getOrCreateLocalCache(name);
-
-                // 如果需要自动刷新，创建可刷新缓存
-                if (config.isRefreshable()) {
-                    return (Cache<K, V>) caches.computeIfAbsent(name + ":refreshable",
-                            k -> new RefreshableCache<K, V>(localCache,
-                                    config.getRefreshInterval(),
-                                    config.getRefreshTimeUnit(),
-                                    2));
-                }
-
-                return localCache;
-        }
-    }
-
-    /**
-     * 设置本地缓存最大大小
-     */
-    public void setLocalCacheMaximumSize(int maximumSize) {
-        // 这里可以设置本地缓存的最大大小
-    }
-
-    /**
      * 设置本地缓存初始容量
      */
-    public void setLocalCacheInitialCapacity(int initialCapacity) {
-        // 这里可以设置本地缓存的初始容量
+    public void setLocalInitialCapacity(int localInitialCapacity) {
+        this.localInitialCapacity = localInitialCapacity;
     }
 
     /**
-     * 设置默认本地缓存过期时间
+     * 设置本地缓存最大容量
      */
-    public void setDefaultLocalExpiration(long expireTime) {
-        // 这里可以设置默认本地缓存过期时间
+    public void setLocalMaximumSize(long localMaximumSize) {
+        this.localMaximumSize = localMaximumSize;
     }
 
     /**
-     * 设置默认本地缓存过期时间单位
+     * 设置本地缓存过期时间
      */
-    public void setDefaultLocalTimeUnit(TimeUnit timeUnit) {
-        // 这里可以设置默认本地缓存过期时间单位
+    public void setLocalExpireAfterWrite(long localExpireAfterWrite) {
+        this.localExpireAfterWrite = localExpireAfterWrite;
     }
 
     /**
-     * 设置默认Redis缓存过期时间
+     * 设置本地缓存时间单位
      */
-    public void setDefaultRedisExpiration(long expireTime) {
-        // 这里可以设置默认Redis缓存过期时间
+    public void setLocalTimeUnit(TimeUnit localTimeUnit) {
+        this.localTimeUnit = localTimeUnit;
     }
 
     /**
-     * 设置默认Redis缓存过期时间单位
+     * 设置Redis缓存过期时间
      */
-    public void setDefaultRedisTimeUnit(TimeUnit timeUnit) {
-        // 这里可以设置默认Redis缓存过期时间单位
+    public void setRedisExpireAfterWrite(long redisExpireAfterWrite) {
+        this.redisExpireAfterWrite = redisExpireAfterWrite;
     }
 
     /**
-     * 设置写透模式
+     * 设置Redis缓存时间单位
+     */
+    public void setRedisTimeUnit(TimeUnit redisTimeUnit) {
+        this.redisTimeUnit = redisTimeUnit;
+    }
+
+    /**
+     * 设置序列化器类型
+     */
+    public void setSerializerType(String serializerType) {
+        this.serializerType = serializerType;
+    }
+
+    /**
+     * 设置是否写穿透
      */
     public void setWriteThrough(boolean writeThrough) {
-        // 这里可以设置写透模式
+        this.writeThrough = writeThrough;
     }
 
     /**
-     * 设置异步写入
+     * 设置是否异步写入
      */
     public void setAsyncWrite(boolean asyncWrite) {
-        // 这里可以设置异步写入
+        this.asyncWrite = asyncWrite;
     }
 
     /**
-     * 初始化缓存同步
+     * 设置是否使用加密
      */
-    public void initCacheSync() {
-        if (redisTemplate == null) {
-            throw new IllegalStateException("RedisTemplate is not set");
-        }
-        if (serializer == null) {
-            throw new IllegalStateException("Serializer is not set");
-        }
-
-        CacheSyncManager.getInstance().init(redisTemplate, serializer);
+    public void setEncrypted(boolean encrypted) {
+        this.encrypted = encrypted;
     }
 
     /**
-     * 关闭缓存管理器
+     * 设置加密密钥
      */
-    public void shutdown() {
-        // 关闭缓存同步管理器
-        CacheSyncManager.getInstance().shutdown();
-
-        // 清空所有缓存
-        clearAll();
+    public void setEncryptionKey(String encryptionKey) {
+        this.encryptionKey = encryptionKey;
     }
-}
+    
+    /**
+     * 设置是否启用缓存同步
+     */
+    public void setSyncEnabled(boolean syncEnabled) {
+        this.syncEnabled = syncEnabled;
+    }
+} 

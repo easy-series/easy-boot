@@ -1,11 +1,11 @@
 package com.easy.id.core.model;
 
-import lombok.Data;
-
 import java.util.concurrent.atomic.AtomicLong;
 
+import lombok.Data;
+
 /**
- * 号段（Segment）模型
+ * 号段模型
  */
 @Data
 public class Segment {
@@ -31,25 +31,7 @@ public class Segment {
     private long maxValue;
 
     /**
-     * 获取号段已经使用的百分比
-     */
-    public double getUsedPercent() {
-        long current = currentValue.get();
-        if (current >= maxValue) {
-            return 100.0;
-        }
-        return (double) (current - (maxValue - step)) / step * 100;
-    }
-
-    /**
-     * 是否需要加载下一个号段
-     */
-    public boolean isNeedToLoadNext() {
-        return getUsedPercent() > 70.0;
-    }
-
-    /**
-     * 是否用尽
+     * 是否用完
      */
     public boolean isExhausted() {
         return currentValue.get() >= maxValue;
@@ -58,7 +40,19 @@ public class Segment {
     /**
      * 获取下一个值
      */
-    public long nextValue() {
+    public long getNextValue() {
         return currentValue.incrementAndGet();
+    }
+
+    /**
+     * 获取当前进度百分比
+     */
+    public int getLoadingPercent() {
+        if (step == 0) {
+            return 100;
+        }
+        long currentVal = currentValue.get();
+        long startVal = maxValue - step;
+        return (int) (((currentVal - startVal) / (double) step) * 100);
     }
 }

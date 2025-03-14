@@ -5,10 +5,6 @@ package com.easy.easylock.exception;
  */
 public class LockException extends RuntimeException {
 
-    public LockException() {
-        super();
-    }
-
     public LockException(String message) {
         super(message);
     }
@@ -20,4 +16,4 @@ public class LockException extends RuntimeException {
     public LockException(Throwable cause) {
         super(cause);
     }
-}
+} 

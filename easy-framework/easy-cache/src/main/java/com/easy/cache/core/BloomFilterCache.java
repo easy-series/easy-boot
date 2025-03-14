@@ -3,97 +3,115 @@ package com.easy.cache.core;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
 
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
- * 布隆过滤器缓存装饰器，用于防止缓存穿透
+ * 布隆过滤器缓存实现，用于防止缓存穿透
+ *
+ * @param <K> 键类型
+ * @param <V> 值类型
  */
 public class BloomFilterCache<K, V> extends AbstractCache<K, V> {
 
+    /**
+     * 被装饰的缓存
+     */
     private final Cache<K, V> delegate;
+
+    /**
+     * 布隆过滤器
+     */
     private final BloomFilter<String> bloomFilter;
 
     /**
-     * 创建布隆过滤器缓存
-     * 
-     * @param delegate 被装饰的缓存
-     * @param expectedInsertions 预期插入数量
-     * @param fpp 误判率
+     * 空值标记
      */
-    public BloomFilterCache(Cache<K, V> delegate, int expectedInsertions, double fpp) {
-        super(delegate.getName() + ":bloom");
+    private final V nullValue;
+
+    /**
+     * 构造函数
+     *
+     * @param delegate 被装饰的缓存
+     * @param expectedInsertions 预期插入元素数量
+     * @param fpp 误判率
+     * @param nullValue 空值标记，用于缓存不存在的值
+     */
+    public BloomFilterCache(Cache<K, V> delegate, int expectedInsertions, double fpp, V nullValue) {
+        super(delegate.getName() + "_bloom_filter");
         this.delegate = delegate;
         this.bloomFilter = BloomFilter.create(
-            Funnels.stringFunnel(Charset.defaultCharset()),
-            expectedInsertions,
-            fpp
-        );
+                Funnels.stringFunnel(StandardCharsets.UTF_8),
+                expectedInsertions,
+                fpp);
+        this.nullValue = nullValue;
+    }
+
+    /**
+     * 将键转换为字符串
+     *
+     * @param key 键
+     * @return 字符串键
+     */
+    private String keyToString(K key) {
+        return key == null ? "null" : key.toString();
     }
 
     @Override
     public V get(K key) {
-        if (key == null) {
+        // 如果布隆过滤器判断键不存在，直接返回空
+        if (!bloomFilter.mightContain(keyToString(key))) {
             return null;
         }
-        
-        // 如果布隆过滤器中不存在，则直接返回null
-        if (!bloomFilter.mightContain(key.toString())) {
+
+        // 从委托缓存获取值
+        V value = delegate.get(key);
+
+        // 如果获取的是空值标记，返回null
+        if (value != null && value.equals(nullValue)) {
             return null;
         }
-        
-        // 否则从缓存中获取
-        return delegate.get(key);
+
+        return value;
     }
 
     @Override
-    public V get(K key, Function<K, V> loader) {
-        if (key == null) {
-            return null;
-        }
-        
-        // 如果布隆过滤器中不存在，且有加载器，则尝试加载
-        if (!bloomFilter.mightContain(key.toString()) && loader != null) {
-            V value = loader.apply(key);
-            if (value != null) {
-                put(key, value);
-            }
-            return value;
-        }
-        
-        // 否则从缓存中获取
-        return delegate.get(key, loader);
-    }
-
-    @Override
-    public void put(K key, V value, long expireTime, TimeUnit timeUnit) {
-        if (key == null) {
-            return;
-        }
-        
-        delegate.put(key, value, expireTime, timeUnit);
-        
+    public void put(K key, V value, long expire, TimeUnit timeUnit) {
         // 将键添加到布隆过滤器
-        bloomFilter.put(key.toString());
+        bloomFilter.put(keyToString(key));
+
+        // 如果值为null，使用空值标记代替
+        if (value == null && nullValue != null) {
+            delegate.put(key, nullValue, expire, timeUnit);
+        } else {
+            delegate.put(key, value, expire, timeUnit);
+        }
     }
 
     @Override
     public boolean remove(K key) {
-        if (key == null) {
-            return false;
-        }
-        
-        // 注意：布隆过滤器不支持删除操作
-        // 所以这里只从缓存中删除，布隆过滤器中的记录会保留
+        // 从委托缓存移除，但不从布隆过滤器移除（布隆过滤器不支持删除）
         return delegate.remove(key);
     }
 
     @Override
     public void clear() {
+        // 只清除委托缓存，无法清除布隆过滤器
         delegate.clear();
-        // 注意：布隆过滤器不支持清空操作
-        // 这里需要重新创建一个布隆过滤器
-        // 但这可能会导致内存泄漏，所以不建议频繁调用clear方法
+    }
+
+    @Override
+    public boolean contains(K key) {
+        // 先检查布隆过滤器
+        if (!bloomFilter.mightContain(keyToString(key))) {
+            return false;
+        }
+        // 再检查委托缓存
+        return delegate.contains(key);
+    }
+
+    @Override
+    public long size() {
+        return delegate.size();
     }
 } 

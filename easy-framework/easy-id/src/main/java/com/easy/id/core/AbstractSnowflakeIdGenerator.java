@@ -1,6 +1,7 @@
 package com.easy.id.core;
 
 import com.easy.id.exception.IdGeneratorException;
+
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -128,7 +129,7 @@ public abstract class AbstractSnowflakeIdGenerator implements IdGenerator {
     /**
      * 等待下一个毫秒
      */
-    private long tilNextMillis(long lastTimestamp) {
+    protected long tilNextMillis(long lastTimestamp) {
         long timestamp = timeGen();
         while (timestamp <= lastTimestamp) {
             timestamp = timeGen();

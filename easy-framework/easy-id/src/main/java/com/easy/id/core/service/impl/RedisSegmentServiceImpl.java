@@ -1,15 +1,17 @@
 package com.easy.id.core.service.impl;
 
-import com.easy.id.core.model.Segment;
-import com.easy.id.core.service.SegmentService;
-import com.easy.id.exception.IdGeneratorException;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Collections;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.core.script.RedisScript;
 
-import java.util.Collections;
-import java.util.concurrent.atomic.AtomicLong;
+import com.easy.id.core.model.Segment;
+import com.easy.id.core.service.SegmentService;
+import com.easy.id.exception.IdGeneratorException;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * 基于Redis的号段服务实现
@@ -47,6 +49,12 @@ public class RedisSegmentServiceImpl implements SegmentService {
     private final RedisScript<Long> incrScript = new DefaultRedisScript<>(LUA_SCRIPT, Long.class);
     private final RedisScript<Long> initScript = new DefaultRedisScript<>(INIT_SCRIPT, Long.class);
 
+    /**
+     * 构造方法
+     *
+     * @param redisTemplate Redis模板
+     * @param keyPrefix     键前缀
+     */
     public RedisSegmentServiceImpl(StringRedisTemplate redisTemplate, String keyPrefix) {
         this.redisTemplate = redisTemplate;
         this.keyPrefix = keyPrefix;
@@ -60,7 +68,9 @@ public class RedisSegmentServiceImpl implements SegmentService {
                     String.valueOf(step));
 
             if (currentValue == null || currentValue < 0) {
-                throw new IdGeneratorException("业务键不存在: " + businessKey);
+                // 键不存在，需要初始化
+                initBusinessKey(businessKey, step);
+                return getNextSegment(businessKey, step);
             }
 
             // 创建号段对象
@@ -69,6 +79,10 @@ public class RedisSegmentServiceImpl implements SegmentService {
             segment.setStep(step);
             segment.setCurrentValue(new AtomicLong(currentValue));
             segment.setMaxValue(currentValue + step);
+
+            log.info("获取号段成功: {}, 范围: [{}, {}]", businessKey,
+                    segment.getCurrentValue().get(), segment.getMaxValue());
+
             return segment;
         } catch (Exception e) {
             log.error("获取号段失败", e);

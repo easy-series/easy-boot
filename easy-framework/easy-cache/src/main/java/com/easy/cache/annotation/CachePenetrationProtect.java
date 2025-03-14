@@ -3,16 +3,20 @@ package com.easy.cache.annotation;
 import java.lang.annotation.*;
 
 /**
- * 缓存穿透保护注解，用于防止缓存穿透
- * 当多个线程同时请求同一个不存在的key时，只有一个线程会去查询数据源，其他线程会等待结果
+ * 启用缓存穿透保护
  */
-@Target(ElementType.METHOD)
+@Target({ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface CachePenetrationProtect {
-
+    
     /**
-     * 超时时间，单位毫秒，默认为3000ms
+     * 布隆过滤器的预计元素数量
      */
-    long timeout() default 3000;
+    int expectedSize() default 1000000;
+    
+    /**
+     * 布隆过滤器的假阳性概率
+     */
+    double fpp() default 0.01;
 } 

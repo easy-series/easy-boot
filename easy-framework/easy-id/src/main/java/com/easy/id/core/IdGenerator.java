@@ -35,5 +35,4 @@ public interface IdGenerator {
      * @return 序列号
      */
     long parseSequence(long id);
-
-} 
+}

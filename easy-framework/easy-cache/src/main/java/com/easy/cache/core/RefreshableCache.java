@@ -1,41 +1,68 @@
 package com.easy.cache.core;
 
-import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Function;
 
 /**
- * 可自动刷新的缓存装饰器
+ * 可刷新缓存实现，支持自动刷新
+ *
+ * @param <K> 键类型
+ * @param <V> 值类型
  */
 public class RefreshableCache<K, V> extends AbstractCache<K, V> {
 
+    /**
+     * 被装饰的缓存
+     */
     private final Cache<K, V> delegate;
-    private final Map<K, RefreshTask> refreshTasks = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService scheduler;
-    private final long refreshInterval;
-    private final TimeUnit refreshTimeUnit;
-    private final Map<K, Function<K, V>> loaders = new ConcurrentHashMap<>();
-    private final Map<K, Long> lastAccessTimeMap = new ConcurrentHashMap<>();
-    private long stopRefreshAfterLastAccess = 0; // 最后一次访问后停止刷新的时间（毫秒），0表示不停止
 
     /**
-     * 创建可自动刷新的缓存
-     * 
-     * @param delegate        被装饰的缓存
-     * @param refreshInterval 刷新间隔
-     * @param refreshTimeUnit 刷新间隔时间单位
-     * @param threadPoolSize  线程池大小
+     * 刷新任务调度器
      */
-    public RefreshableCache(Cache<K, V> delegate, long refreshInterval, TimeUnit refreshTimeUnit, int threadPoolSize) {
-        super(delegate.getName() + ":refreshable");
+    private final ScheduledExecutorService scheduler;
+
+    /**
+     * 刷新任务映射
+     */
+    private final ConcurrentMap<K, ScheduledFuture<?>> refreshTasks = new ConcurrentHashMap<>();
+
+    /**
+     * 值加载器
+     */
+    private final Function<K, V> valueLoader;
+
+    /**
+     * 是否随机延迟刷新
+     */
+    private final boolean randomDelay;
+
+    /**
+     * 最大随机延迟时间(秒)
+     */
+    private final int maxRandomDelay;
+
+    /**
+     * 构造函数
+     *
+     * @param delegate 被装饰的缓存
+     * @param valueLoader 值加载器
+     * @param randomDelay 是否随机延迟刷新
+     * @param maxRandomDelay 最大随机延迟时间(秒)
+     */
+    public RefreshableCache(Cache<K, V> delegate, Function<K, V> valueLoader,
+                           boolean randomDelay, int maxRandomDelay) {
+        super(delegate.getName() + "_refreshable");
         this.delegate = delegate;
-        this.refreshInterval = refreshInterval;
-        this.refreshTimeUnit = refreshTimeUnit;
-        this.scheduler = new ScheduledThreadPoolExecutor(threadPoolSize, r -> {
-            Thread thread = new Thread(r, "RefreshableCache-" + delegate.getName());
-            thread.setDaemon(true);
-            return thread;
-        });
+        this.valueLoader = valueLoader;
+        this.randomDelay = randomDelay;
+        this.maxRandomDelay = maxRandomDelay;
+        this.scheduler = Executors.newScheduledThreadPool(
+                Runtime.getRuntime().availableProcessors(),
+                r -> {
+                    Thread thread = new Thread(r, "cache-refresh-thread");
+                    thread.setDaemon(true);
+                    return thread;
+                });
     }
 
     @Override
@@ -44,22 +71,82 @@ public class RefreshableCache<K, V> extends AbstractCache<K, V> {
     }
 
     @Override
-    public V get(K key, Function<K, V> loader) {
-        V value = delegate.get(key);
-        if (value == null && loader != null) {
-            value = loader.apply(key);
-            if (value != null) {
-                put(key, value);
-                // 注册加载器，用于自动刷新
-                registerLoader(key, loader);
-            }
-        }
-        return value;
+    public void put(K key, V value, long expire, TimeUnit timeUnit) {
+        delegate.put(key, value, expire, timeUnit);
     }
 
-    @Override
-    public void put(K key, V value, long expireTime, TimeUnit timeUnit) {
-        delegate.put(key, value, expireTime, timeUnit);
+    /**
+     * 放入可刷新的缓存
+     *
+     * @param key 缓存键
+     * @param value 缓存值
+     * @param expire 过期时间
+     * @param timeUnit 时间单位
+     * @param refreshPeriod 刷新周期
+     * @param refreshTimeUnit 刷新周期时间单位
+     */
+    public void putWithRefresh(K key, V value, long expire, TimeUnit timeUnit,
+                              long refreshPeriod, TimeUnit refreshTimeUnit) {
+        delegate.put(key, value, expire, timeUnit);
+        scheduleRefresh(key, refreshPeriod, refreshTimeUnit);
+    }
+
+    /**
+     * 调度刷新任务
+     *
+     * @param key 缓存键
+     * @param refreshPeriod 刷新周期
+     * @param refreshTimeUnit 刷新周期时间单位
+     */
+    private void scheduleRefresh(K key, long refreshPeriod, TimeUnit refreshTimeUnit) {
+        // 取消已存在的刷新任务
+        cancelRefreshTask(key);
+
+        // 计算延迟时间
+        long initialDelay = refreshPeriod;
+        if (randomDelay) {
+            // 添加随机延迟，防止缓存雪崩
+            ThreadLocalRandom random = ThreadLocalRandom.current();
+            initialDelay += random.nextLong(0, maxRandomDelay);
+        }
+
+        // 调度新的刷新任务
+        ScheduledFuture<?> future = scheduler.scheduleAtFixedRate(
+                () -> refreshKey(key),
+                initialDelay,
+                refreshPeriod,
+                refreshTimeUnit);
+
+        refreshTasks.put(key, future);
+    }
+
+    /**
+     * 刷新指定键的缓存
+     *
+     * @param key 缓存键
+     */
+    private void refreshKey(K key) {
+        try {
+            V newValue = valueLoader.apply(key);
+            if (newValue != null) {
+                delegate.put(key, newValue);
+            }
+        } catch (Exception e) {
+            // 刷新失败，记录日志，但不中断后续刷新
+            System.err.println("Failed to refresh cache key: " + key + ", error: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 取消刷新任务
+     *
+     * @param key 缓存键
+     */
+    private void cancelRefreshTask(K key) {
+        ScheduledFuture<?> future = refreshTasks.remove(key);
+        if (future != null) {
+            future.cancel(false);
+        }
     }
 
     @Override
@@ -70,118 +157,28 @@ public class RefreshableCache<K, V> extends AbstractCache<K, V> {
 
     @Override
     public void clear() {
-        cancelAllRefreshTasks();
+        // 取消所有刷新任务
+        refreshTasks.forEach((key, future) -> future.cancel(false));
+        refreshTasks.clear();
+
         delegate.clear();
     }
 
-    /**
-     * 注册加载器，用于自动刷新
-     */
-    public void registerLoader(K key, Function<K, V> loader) {
-        if (key == null || loader == null) {
-            return;
-        }
+    @Override
+    public boolean contains(K key) {
+        return delegate.contains(key);
+    }
 
-        loaders.put(key, loader);
-        scheduleRefresh(key);
+    @Override
+    public long size() {
+        return delegate.size();
     }
 
     /**
-     * 取消指定键的刷新任务
+     * 关闭缓存，释放资源
      */
-    public void cancelRefreshTask(K key) {
-        RefreshTask task = refreshTasks.remove(key);
-        if (task != null) {
-            task.cancel();
-        }
-        loaders.remove(key);
+    public void shutdown() {
+        clear();
+        scheduler.shutdown();
     }
-
-    /**
-     * 取消所有刷新任务
-     */
-    public void cancelAllRefreshTasks() {
-        for (RefreshTask task : refreshTasks.values()) {
-            task.cancel();
-        }
-        refreshTasks.clear();
-        loaders.clear();
-    }
-
-    /**
-     * 安排刷新任务
-     */
-    private void scheduleRefresh(K key) {
-        Function<K, V> loader = loaders.get(key);
-        if (loader == null) {
-            return;
-        }
-
-        // 取消已有的刷新任务
-        cancelRefreshTask(key);
-
-        // 创建新的刷新任务
-        RefreshTask task = new RefreshTask(key, loader);
-        ScheduledFuture<?> future = scheduler.scheduleWithFixedDelay(
-                task, refreshInterval, refreshInterval, refreshTimeUnit);
-        task.setFuture(future);
-        refreshTasks.put(key, task);
-    }
-
-    /**
-     * 刷新任务
-     */
-    private class RefreshTask implements Runnable {
-        private final K key;
-        private final Function<K, V> loader;
-        private ScheduledFuture<?> future;
-
-        public RefreshTask(K key, Function<K, V> loader) {
-            this.key = key;
-            this.loader = loader;
-        }
-
-        public void setFuture(ScheduledFuture<?> future) {
-            this.future = future;
-        }
-
-        public void cancel() {
-            if (future != null) {
-                future.cancel(false);
-            }
-        }
-
-        @Override
-        public void run() {
-            try {
-                // 检查键是否存在
-                if (delegate.get(key) == null) {
-                    // 如果键不存在，取消刷新任务
-                    cancelRefreshTask(key);
-                    return;
-                }
-
-                // 加载新值
-                V newValue = loader.apply(key);
-                if (newValue != null) {
-                    // 更新缓存
-                    delegate.put(key, newValue);
-                }
-            } catch (Exception e) {
-                // 忽略异常，继续下一次刷新
-                System.err.println("Error refreshing cache key: " + key + ", " + e.getMessage());
-            }
-        }
-    }
-
-    /**
-     * 设置最后一次访问后停止刷新的时间
-     * 
-     * @param stopRefreshAfterLastAccess 最后一次访问后停止刷新的时间，单位与创建缓存时指定的时间单位相同
-     */
-    public void setStopRefreshAfterLastAccess(long stopRefreshAfterLastAccess) {
-        this.stopRefreshAfterLastAccess = stopRefreshAfterLastAccess > 0
-                ? TimeUnit.MILLISECONDS.convert(stopRefreshAfterLastAccess, refreshTimeUnit)
-                : 0;
-    }
-}
+} 
