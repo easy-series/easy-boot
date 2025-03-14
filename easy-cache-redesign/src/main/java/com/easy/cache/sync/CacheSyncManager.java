@@ -2,7 +2,7 @@ package com.easy.cache.sync;
 
 import com.easy.cache.core.Cache;
 import com.easy.cache.core.CacheManager;
-import com.easy.cache.core.RedisCache.Serializer;
+import com.easy.cache.util.Serializer;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.Map;
@@ -28,21 +28,45 @@ public class CacheSyncManager {
         UPDATE
     }
 
+    /**
+     * 单例实例
+     */
     private static final CacheSyncManager INSTANCE = new CacheSyncManager();
 
+    /**
+     * 同步配置映射表
+     */
     private final Map<String, SyncConfig> syncConfigMap = new ConcurrentHashMap<>();
+
+    /**
+     * 缓存事件发布者
+     */
     private CacheEventPublisher publisher;
+
+    /**
+     * 缓存事件订阅者
+     */
     private CacheEventSubscriber subscriber;
+
+    /**
+     * 是否已初始化
+     */
     private boolean initialized = false;
+
+    /**
+     * 默认同步策略
+     */
     private SyncStrategy defaultStrategy = SyncStrategy.INVALIDATE;
 
+    /**
+     * 私有构造函数
+     */
     private CacheSyncManager() {
-        // 私有构造函数，防止外部实例化
     }
 
     /**
      * 获取单例实例
-     * 
+     *
      * @return 缓存同步管理器实例
      */
     public static CacheSyncManager getInstance() {
@@ -51,7 +75,7 @@ public class CacheSyncManager {
 
     /**
      * 初始化缓存同步管理器
-     * 
+     *
      * @param redisTemplate Redis模板
      * @param serializer    序列化器
      */
@@ -78,8 +102,8 @@ public class CacheSyncManager {
     }
 
     /**
-     * 设置默认的同步策略
-     * 
+     * 设置默认同步策略
+     *
      * @param strategy 同步策略
      */
     public void setDefaultSyncStrategy(SyncStrategy strategy) {
@@ -88,7 +112,7 @@ public class CacheSyncManager {
 
     /**
      * 处理缓存事件
-     * 
+     *
      * @param event 缓存事件
      */
     private void handleCacheEvent(CacheEvent event) {
@@ -99,8 +123,8 @@ public class CacheSyncManager {
         String cacheName = event.getCacheName();
         SyncConfig config = syncConfigMap.get(cacheName);
 
-        // 如果缓存没有启用同步，或者不是本地同步，则忽略事件
-        if (config == null || !config.isSyncEnabled() || !config.isSyncLocal()) {
+        // 如果缓存没有启用同步，则忽略事件
+        if (config == null || !config.isSyncEnabled()) {
             return;
         }
 
@@ -122,7 +146,7 @@ public class CacheSyncManager {
 
     /**
      * 处理PUT事件
-     * 
+     *
      * @param event    缓存事件
      * @param strategy 同步策略
      */
@@ -156,7 +180,7 @@ public class CacheSyncManager {
 
     /**
      * 处理REMOVE事件
-     * 
+     *
      * @param event 缓存事件
      */
     @SuppressWarnings("unchecked")
@@ -181,7 +205,7 @@ public class CacheSyncManager {
 
     /**
      * 处理CLEAR事件
-     * 
+     *
      * @param event 缓存事件
      */
     @SuppressWarnings("unchecked")
@@ -201,7 +225,7 @@ public class CacheSyncManager {
 
     /**
      * 获取本地缓存
-     * 
+     *
      * @param cacheName 缓存名称
      * @return 本地缓存实例
      */
@@ -226,50 +250,33 @@ public class CacheSyncManager {
 
     /**
      * 启用缓存同步
-     * 
-     * @param cacheName 缓存名称
-     * @param syncLocal 是否同步本地缓存
+     *
+     * @param cacheName   缓存名称
+     * @param syncEnabled 是否启用同步
      */
-    public void enableSync(String cacheName, boolean syncLocal) {
-        enableSync(cacheName, syncLocal, defaultStrategy);
+    public void enableSync(String cacheName, boolean syncEnabled) {
+        enableSync(cacheName, syncEnabled, defaultStrategy);
     }
 
     /**
      * 启用缓存同步
-     * 
-     * @param cacheName 缓存名称
-     * @param syncLocal 是否同步本地缓存
-     * @param strategy  同步策略
+     *
+     * @param cacheName   缓存名称
+     * @param syncEnabled 是否启用同步
+     * @param strategy    同步策略
      */
-    public void enableSync(String cacheName, boolean syncLocal, SyncStrategy strategy) {
+    public void enableSync(String cacheName, boolean syncEnabled, SyncStrategy strategy) {
         if (cacheName == null || cacheName.isEmpty()) {
             return;
         }
 
-        syncConfigMap.put(cacheName, new SyncConfig(true, syncLocal, strategy));
-        System.out.println("已启用缓存同步: " + cacheName + ", 本地同步: " + syncLocal + ", 策略: " + strategy);
-    }
-
-    /**
-     * 禁用缓存同步
-     * 
-     * @param cacheName 缓存名称
-     */
-    public void disableSync(String cacheName) {
-        if (cacheName == null || cacheName.isEmpty()) {
-            return;
-        }
-
-        SyncConfig config = syncConfigMap.get(cacheName);
-        if (config != null) {
-            syncConfigMap.put(cacheName, new SyncConfig(false, config.isSyncLocal(), config.getSyncStrategy()));
-            System.out.println("已禁用缓存同步: " + cacheName);
-        }
+        syncConfigMap.put(cacheName, new SyncConfig(syncEnabled, strategy));
+        System.out.println("已" + (syncEnabled ? "启用" : "禁用") + "缓存同步: " + cacheName + ", 策略: " + strategy);
     }
 
     /**
      * 发布缓存事件
-     * 
+     *
      * @param event 缓存事件
      */
     public void publishEvent(CacheEvent event) {
@@ -309,21 +316,15 @@ public class CacheSyncManager {
      */
     private static class SyncConfig {
         private final boolean syncEnabled;
-        private final boolean syncLocal;
         private final SyncStrategy syncStrategy;
 
-        public SyncConfig(boolean syncEnabled, boolean syncLocal, SyncStrategy syncStrategy) {
+        public SyncConfig(boolean syncEnabled, SyncStrategy syncStrategy) {
             this.syncEnabled = syncEnabled;
-            this.syncLocal = syncLocal;
             this.syncStrategy = syncStrategy;
         }
 
         public boolean isSyncEnabled() {
             return syncEnabled;
-        }
-
-        public boolean isSyncLocal() {
-            return syncLocal;
         }
 
         public SyncStrategy getSyncStrategy() {

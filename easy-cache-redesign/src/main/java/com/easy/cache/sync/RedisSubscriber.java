@@ -1,6 +1,6 @@
 package com.easy.cache.sync;
 
-import com.easy.cache.core.RedisCache.Serializer;
+import com.easy.cache.util.Serializer;
 import org.springframework.data.redis.connection.Message;
 import org.springframework.data.redis.connection.MessageListener;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -19,18 +19,44 @@ import java.util.concurrent.Executors;
  */
 public class RedisSubscriber implements CacheEventSubscriber {
 
+    /**
+     * Redis主题前缀
+     */
     private static final String CHANNEL_PREFIX = "easy-cache:sync:";
 
+    /**
+     * Redis模板
+     */
     private final RedisTemplate<String, Object> redisTemplate;
+
+    /**
+     * 序列化器
+     */
     private final Serializer serializer;
+
+    /**
+     * 监听器映射表
+     */
     private final Map<String, List<CacheEventListener>> listenerMap = new ConcurrentHashMap<>();
+
+    /**
+     * 事件处理线程池
+     */
     private final ExecutorService eventProcessor;
+
+    /**
+     * Redis消息监听容器
+     */
     private RedisMessageListenerContainer listenerContainer;
+
+    /**
+     * 是否已启动
+     */
     private boolean running = false;
 
     /**
-     * 创建Redis订阅者
-     * 
+     * 构造函数
+     *
      * @param redisTemplate Redis模板
      * @param serializer    序列化器
      */
@@ -56,7 +82,7 @@ public class RedisSubscriber implements CacheEventSubscriber {
 
     /**
      * 为指定缓存注册监听器
-     * 
+     *
      * @param cacheName 缓存名称
      * @param listener  监听器
      */
@@ -114,8 +140,7 @@ public class RedisSubscriber implements CacheEventSubscriber {
         public void onMessage(Message message, byte[] pattern) {
             try {
                 // 反序列化事件
-                byte[] messageBytes = message.getBody();
-                CacheEvent event = serializer.deserialize(messageBytes, CacheEvent.class);
+                CacheEvent event = (CacheEvent) redisTemplate.getValueSerializer().deserialize(message.getBody());
                 if (event == null) {
                     return;
                 }

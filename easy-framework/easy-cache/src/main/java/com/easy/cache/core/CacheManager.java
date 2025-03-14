@@ -2,7 +2,7 @@ package com.easy.cache.core;
 
 import com.easy.cache.core.RedisCache.Serializer;
 import com.easy.cache.sync.CacheSyncManager;
-import redis.clients.jedis.JedisPool;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.Arrays;
 import java.util.List;
@@ -18,7 +18,7 @@ public class CacheManager {
     private static final CacheManager INSTANCE = new CacheManager();
 
     private final Map<String, Cache<?, ?>> caches = new ConcurrentHashMap<>();
-    private JedisPool jedisPool;
+    private RedisTemplate<String, Object> redisTemplate;
     private Serializer serializer;
 
     private CacheManager() {
@@ -32,10 +32,10 @@ public class CacheManager {
     }
 
     /**
-     * 设置Redis连接池
+     * 设置Redis模板
      */
-    public void setJedisPool(JedisPool jedisPool) {
-        this.jedisPool = jedisPool;
+    public void setRedisTemplate(RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
     }
 
     /**
@@ -46,12 +46,12 @@ public class CacheManager {
     }
 
     /**
-     * 获取Redis连接池
+     * 获取Redis模板
      * 
-     * @return Redis连接池
+     * @return Redis模板
      */
-    public JedisPool getJedisPool() {
-        return jedisPool;
+    public RedisTemplate<String, Object> getRedisTemplate() {
+        return redisTemplate;
     }
 
     /**
@@ -82,15 +82,15 @@ public class CacheManager {
      */
     @SuppressWarnings("unchecked")
     public <K, V> Cache<K, V> getOrCreateRedisCache(String name) {
-        if (jedisPool == null) {
-            throw new IllegalStateException("JedisPool is not set");
+        if (redisTemplate == null) {
+            throw new IllegalStateException("RedisTemplate is not set");
         }
         if (serializer == null) {
             throw new IllegalStateException("Serializer is not set");
         }
 
         return (Cache<K, V>) caches.computeIfAbsent(name + ":redis",
-                k -> new RedisCache<K, V>(name, jedisPool, serializer));
+                k -> new RedisCache<K, V>(name, redisTemplate, serializer));
     }
 
     /**
@@ -127,8 +127,8 @@ public class CacheManager {
     @SuppressWarnings("unchecked")
     public <K, V> Cache<K, V> getOrCreateTwoLevelCache(String name, boolean writeThrough, boolean asyncWrite,
             boolean syncLocal) {
-        if (jedisPool == null) {
-            throw new IllegalStateException("JedisPool is not set");
+        if (redisTemplate == null) {
+            throw new IllegalStateException("RedisTemplate is not set");
         }
         if (serializer == null) {
             throw new IllegalStateException("Serializer is not set");
@@ -174,8 +174,8 @@ public class CacheManager {
     public <K, V> RefreshableCache<K, V> getOrCreateRefreshableRedisCache(String name, long refreshInterval,
             TimeUnit refreshTimeUnit, int threadPoolSize) {
 
-        if (jedisPool == null) {
-            throw new IllegalStateException("JedisPool is not set");
+        if (redisTemplate == null) {
+            throw new IllegalStateException("RedisTemplate is not set");
         }
         if (serializer == null) {
             throw new IllegalStateException("Serializer is not set");
@@ -333,14 +333,14 @@ public class CacheManager {
      * 初始化缓存同步
      */
     public void initCacheSync() {
-        if (jedisPool == null) {
-            throw new IllegalStateException("JedisPool is not set");
+        if (redisTemplate == null) {
+            throw new IllegalStateException("RedisTemplate is not set");
         }
         if (serializer == null) {
             throw new IllegalStateException("Serializer is not set");
         }
 
-        CacheSyncManager.getInstance().init(jedisPool, serializer);
+        CacheSyncManager.getInstance().init(redisTemplate, serializer);
     }
 
     /**

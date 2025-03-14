@@ -1,6 +1,6 @@
 package com.easy.cache.sync;
 
-import com.easy.cache.core.RedisCache.Serializer;
+import com.easy.cache.util.Serializer;
 import org.springframework.data.redis.core.RedisTemplate;
 
 import java.util.concurrent.ExecutorService;
@@ -11,15 +11,29 @@ import java.util.concurrent.Executors;
  */
 public class RedisPublisher implements CacheEventPublisher {
 
+    /**
+     * Redis主题前缀
+     */
     private static final String CHANNEL_PREFIX = "easy-cache:sync:";
 
+    /**
+     * Redis模板
+     */
     private final RedisTemplate<String, Object> redisTemplate;
+
+    /**
+     * 序列化器
+     */
     private final Serializer serializer;
+
+    /**
+     * 异步发布线程池
+     */
     private final ExecutorService executor;
 
     /**
-     * 创建Redis发布者
-     * 
+     * 构造函数
+     *
      * @param redisTemplate Redis模板
      * @param serializer    序列化器
      */
@@ -43,8 +57,7 @@ public class RedisPublisher implements CacheEventPublisher {
         executor.execute(() -> {
             try {
                 String channel = CHANNEL_PREFIX + event.getCacheName();
-                byte[] message = serializer.serialize(event);
-                redisTemplate.convertAndSend(channel, message);
+                redisTemplate.convertAndSend(channel, event);
             } catch (Exception e) {
                 System.err.println("发布缓存事件失败: " + e.getMessage());
             }
