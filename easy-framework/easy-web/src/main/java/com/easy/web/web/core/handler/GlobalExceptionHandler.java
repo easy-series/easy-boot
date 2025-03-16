@@ -1,13 +1,19 @@
 package com.easy.web.web.core.handler;
 
 import cn.hutool.core.exceptions.ExceptionUtil;
+import cn.hutool.core.lang.Assert;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.ObjUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.collection.SetUtils;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
+import com.easy.web.apilog.ApiErrorLogApi;
+import com.easy.web.apilog.ApiErrorLogCreateReqDTO;
 import com.easy.web.web.core.util.WebFrameworkUtils;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import lombok.AllArgsConstructor;
@@ -28,6 +34,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
 import javax.validation.ValidationException;
+import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.enums.GlobalErrorCodeConstants.*;
@@ -50,7 +58,7 @@ public class GlobalExceptionHandler {
     @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
     private final String applicationName;
 
-//    private final ApiErrorLogApi apiErrorLogApi;
+    private final ApiErrorLogApi apiErrorLogApi;
 
     /**
      * 处理所有异常，主要是提供给 Filter 使用
@@ -261,53 +269,53 @@ public class GlobalExceptionHandler {
         // 情况二：处理异常
         log.error("[defaultExceptionHandler]", ex);
         // 插入异常日志
-        // createExceptionLog(req, ex);
+        createExceptionLog(req, ex);
         // 返回 ERROR CommonResult
         return CommonResult.error(INTERNAL_SERVER_ERROR.getCode(), INTERNAL_SERVER_ERROR.getMsg());
     }
 
-//    private void createExceptionLog(HttpServletRequest req, Throwable e) {
-//        // 插入错误日志
-//        ApiErrorLogCreateReqDTO errorLog = new ApiErrorLogCreateReqDTO();
-//        try {
-//            // 初始化 errorLog
-//            buildExceptionLog(errorLog, req, e);
-//            // 执行插入 errorLog
-//            apiErrorLogApi.createApiErrorLogAsync(errorLog);
-//        } catch (Throwable th) {
-//            log.error("[createExceptionLog][url({}) log({}) 发生异常]", req.getRequestURI(),  JsonUtils.toJsonString(errorLog), th);
-//        }
-//    }
+    private void createExceptionLog(HttpServletRequest req, Throwable e) {
+        // 插入错误日志
+        ApiErrorLogCreateReqDTO errorLog = new ApiErrorLogCreateReqDTO();
+        try {
+            // 初始化 errorLog
+            buildExceptionLog(errorLog, req, e);
+            // 执行插入 errorLog
+            apiErrorLogApi.createApiErrorLogAsync(errorLog);
+        } catch (Throwable th) {
+            log.error("[createExceptionLog][url({}) log({}) 发生异常]", req.getRequestURI(), JsonUtils.toJsonString(errorLog), th);
+        }
+    }
 
-//    private void buildExceptionLog(ApiErrorLogCreateReqDTO errorLog, HttpServletRequest request, Throwable e) {
-//        // 处理用户信息
-//        errorLog.setUserId(WebFrameworkUtils.getLoginUserId(request));
-//        errorLog.setUserType(WebFrameworkUtils.getLoginUserType(request));
-//        // 设置异常字段
-//        errorLog.setExceptionName(e.getClass().getName());
-//        errorLog.setExceptionMessage(ExceptionUtil.getMessage(e));
-//        errorLog.setExceptionRootCauseMessage(ExceptionUtil.getRootCauseMessage(e));
-//        errorLog.setExceptionStackTrace(ExceptionUtil.stacktraceToString(e));
-//        StackTraceElement[] stackTraceElements = e.getStackTrace();
-//        Assert.notEmpty(stackTraceElements, "异常 stackTraceElements 不能为空");
-//        StackTraceElement stackTraceElement = stackTraceElements[0];
-//        errorLog.setExceptionClassName(stackTraceElement.getClassName());
-//        errorLog.setExceptionFileName(stackTraceElement.getFileName());
-//        errorLog.setExceptionMethodName(stackTraceElement.getMethodName());
-//        errorLog.setExceptionLineNumber(stackTraceElement.getLineNumber());
-//        // 设置其它字段
-//        errorLog.setTraceId(TracerUtils.getTraceId());
-//        errorLog.setApplicationName(applicationName);
-//        errorLog.setRequestUrl(request.getRequestURI());
-//        Map<String, Object> requestParams = MapUtil.<String, Object>builder()
-//                .put("query", ServletUtils.getParamMap(request))
-//                .put("body", ServletUtils.getBody(request)).build();
-//        errorLog.setRequestParams(JsonUtils.toJsonString(requestParams));
-//        errorLog.setRequestMethod(request.getMethod());
-//        errorLog.setUserAgent(ServletUtils.getUserAgent(request));
-//        errorLog.setUserIp(ServletUtils.getClientIP(request));
-//        errorLog.setExceptionTime(LocalDateTime.now());
-//    }
+    private void buildExceptionLog(ApiErrorLogCreateReqDTO errorLog, HttpServletRequest request, Throwable e) {
+        // 处理用户信息
+        errorLog.setUserId(WebFrameworkUtils.getLoginUserId(request));
+        errorLog.setUserType(WebFrameworkUtils.getLoginUserType(request));
+        // 设置异常字段
+        errorLog.setExceptionName(e.getClass().getName());
+        errorLog.setExceptionMessage(ExceptionUtil.getMessage(e));
+        errorLog.setExceptionRootCauseMessage(ExceptionUtil.getRootCauseMessage(e));
+        errorLog.setExceptionStackTrace(ExceptionUtil.stacktraceToString(e));
+        StackTraceElement[] stackTraceElements = e.getStackTrace();
+        Assert.notEmpty(stackTraceElements, "异常 stackTraceElements 不能为空");
+        StackTraceElement stackTraceElement = stackTraceElements[0];
+        errorLog.setExceptionClassName(stackTraceElement.getClassName());
+        errorLog.setExceptionFileName(stackTraceElement.getFileName());
+        errorLog.setExceptionMethodName(stackTraceElement.getMethodName());
+        errorLog.setExceptionLineNumber(stackTraceElement.getLineNumber());
+        // 设置其它字段
+        errorLog.setTraceId(TracerUtils.getTraceId());
+        errorLog.setApplicationName(applicationName);
+        errorLog.setRequestUrl(request.getRequestURI());
+        Map<String, Object> requestParams = MapUtil.<String, Object>builder()
+                .put("query", ServletUtils.getParamMap(request))
+                .put("body", ServletUtils.getBody(request)).build();
+        errorLog.setRequestParams(JsonUtils.toJsonString(requestParams));
+        errorLog.setRequestMethod(request.getMethod());
+        errorLog.setUserAgent(ServletUtils.getUserAgent(request));
+        errorLog.setUserIp(ServletUtils.getClientIP(request));
+        errorLog.setExceptionTime(LocalDateTime.now());
+    }
 
     /**
      * 处理 Table 不存在的异常情况

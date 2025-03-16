@@ -16,6 +16,9 @@
         <module>easy-cache</module>
         <module>easy-job</module>
         <module>easy-web</module>
+        <module>easy-redis</module>
+        <module>easy-file</module>
+        <module>easy-mq</module>
     </modules>
 
     <artifactId>easy-framework</artifactId>

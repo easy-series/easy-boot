@@ -15,6 +15,7 @@
         <option value="$PROJECT_DIR$/easy-framework/easy-mybatis/pom.xml" />
         <option value="$PROJECT_DIR$/easy-framework/easy-file/pom.xml" />
         <option value="$PROJECT_DIR$/easy-framework/easy-redis/pom.xml" />
+        <option value="$PROJECT_DIR$/easy-framework/easy-mq/pom.xml" />
       </list>
     </option>
     <option name="ignoredFiles">

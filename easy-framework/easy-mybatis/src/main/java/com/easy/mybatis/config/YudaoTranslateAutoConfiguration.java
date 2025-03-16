@@ -1,6 +1,6 @@
 package com.easy.mybatis.config;
 
-import cn.iocoder.yudao.framework.translate.core.TranslateUtils;
+import com.easy.mybatis.core.TranslateUtils;
 import com.fhs.trans.service.impl.TransService;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;
