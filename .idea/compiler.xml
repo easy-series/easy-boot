@@ -7,22 +7,22 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-      </profile>
-      <profile name="Annotation profile for easy-boot" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/springframework/boot/spring-boot-configuration-processor/2.7.18/spring-boot-configuration-processor-2.7.18.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.36/lombok-1.18.36.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct-processor/1.6.3/mapstruct-processor-1.6.3.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/mapstruct/mapstruct/1.6.3/mapstruct-1.6.3.jar" />
-        </processorPath>
+        <module name="easy-redis" />
         <module name="easy-id" />
+        <module name="yudao-server" />
         <module name="easy-lock" />
-        <module name="easy-cache" />
         <module name="easy-common" />
+        <module name="easy-file" />
+        <module name="easy-mybatis" />
+        <module name="easy-web" />
+        <module name="easy-cache" />
+        <module name="easy-job" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="easy-module-infra-biz" target="1.5" />
+      <module name="yudao-module-infra" target="1.8" />
+      <module name="yudao-module-infra-api" target="1.5" />
+    </bytecodeTargetLevel>
   </component>
 </project>

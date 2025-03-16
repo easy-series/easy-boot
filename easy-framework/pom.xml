@@ -14,6 +14,8 @@
         <module>easy-lock</module>
         <module>easy-id</module>
         <module>easy-cache</module>
+        <module>easy-job</module>
+        <module>easy-web</module>
     </modules>
 
     <artifactId>easy-framework</artifactId>

@@ -1,0 +1,38 @@
+# 测试环境配置
+spring:
+  application:
+    name: easy-cache-test
+  # 允许 Bean 定义覆盖，解决自动配置冲突问题
+  main:
+    allow-bean-definition-overriding: true
+  # 配置真实Redis环境
+  redis:
+    host: localhost
+    port: 6379
+    # 如果需要密码，取消下面的注释并填写正确的密码
+    password: 123456
+    database: 0
+    timeout: 5000ms
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: -1ms
+
+# 缓存框架配置
+easy:
+  cache:
+    enabled: true
+    sync-channel: "easy:cache:sync"
+    default-expire: 3600
+    default-local-limit: 1000
+    default-sync-local: true
+    default-cache-null-values: true
+    default-penetration-protect: true
+
+# 日志配置
+logging:
+  level:
+    com.easy.cache: debug
+    org.springframework.data.redis: info 

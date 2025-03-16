@@ -11,6 +11,7 @@
     <modules>
         <module>easy-framework</module>
         <module>easy-dependencies</module>
+        <module>easy-server</module>
 
     </modules>
 

@@ -1,0 +1,49 @@
+# 测试自动装配的专用配置
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/easy_boot?useSSL=false&useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    # 连接池配置
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+
+# Easy-ID 配置
+easy:
+  id:
+    # 默认使用雪花算法
+    default-type: redis-segment
+    
+    # 雪花算法配置
+    snowflake:
+      enabled: true
+      worker-id: 2
+      data-center-id: 3
+      name: snowflake
+    
+    # 号段模式配置
+    segment:
+      enabled: true
+      table-name: easy_id_allocator
+      name: segment
+      # 号段模式的业务配置
+      biz-configs:
+        user:
+          biz-key: user_id
+          step: 1000
+          description: 用户ID
+        order:
+          biz-key: order_id
+          step: 2000
+          description: 订单ID
+    
+    # Redis号段模式配置
+    redis-segment:
+      enabled: true
+      key-prefix: 'easy:id:segment:'
+      name: redis-segment 
