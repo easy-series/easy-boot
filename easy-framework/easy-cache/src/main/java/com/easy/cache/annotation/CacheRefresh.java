@@ -1,33 +1,32 @@
 package com.easy.cache.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 配置缓存自动刷新
+ * 缓存刷新注解，配置缓存自动刷新
  */
-@Target({ElementType.METHOD})
+@Target({ ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface CacheRefresh {
-    
+
     /**
-     * 刷新周期，单位秒
+     * 刷新间隔
      */
-    long refresh() default 1800;
-    
+    long refresh() default 0;
+
     /**
-     * 刷新周期的时间单位，默认秒
+     * 时间单位
      */
     TimeUnit timeUnit() default TimeUnit.SECONDS;
-    
+
     /**
-     * 是否随机延迟刷新，防止缓存雪崩
+     * 最后访问后停止刷新的时间（秒）
      */
-    boolean randomDelay() default true;
-    
-    /**
-     * 最大随机延迟时间(秒)
-     */
-    int maxRandomDelay() default 300;
-} 
+    long stopRefreshAfterLastAccess() default 0;
+}

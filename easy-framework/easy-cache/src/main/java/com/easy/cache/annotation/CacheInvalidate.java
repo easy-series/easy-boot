@@ -1,27 +1,26 @@
 package com.easy.cache.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * 标记需要使缓存失效的方法
+ * 缓存失效注解，标记需要使缓存失效的方法
  */
-@Target({ElementType.METHOD})
+@Target({ ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface CacheInvalidate {
-    
+
     /**
      * 缓存名称
      */
-    String name();
-    
+    String name() default "";
+
     /**
      * 缓存键，支持SpEL表达式
      */
-    String key();
-    
-    /**
-     * 是否清除该缓存名称下的所有缓存
-     */
-    boolean clearAll() default false;
-} 
+    String key() default "";
+}

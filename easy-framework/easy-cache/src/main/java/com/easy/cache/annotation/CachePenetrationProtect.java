@@ -1,22 +1,21 @@
 package com.easy.cache.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * 启用缓存穿透保护
+ * 缓存穿透保护注解
  */
-@Target({ElementType.METHOD})
+@Target({ ElementType.METHOD })
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface CachePenetrationProtect {
-    
+
     /**
-     * 布隆过滤器的预计元素数量
+     * 是否启用缓存穿透保护
      */
-    int expectedSize() default 1000000;
-    
-    /**
-     * 布隆过滤器的假阳性概率
-     */
-    double fpp() default 0.01;
-} 
+    boolean value() default true;
+}

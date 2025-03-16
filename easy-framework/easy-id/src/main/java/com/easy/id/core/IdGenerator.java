@@ -1,38 +1,31 @@
 package com.easy.id.core;
 
 /**
- * ID生成器接口
+ * ID生成器接口，是分布式ID生成系统的核心接口
+ *
+ * @author 芋道源码
  */
 public interface IdGenerator {
 
     /**
      * 获取下一个ID
      *
-     * @return 生成的ID
+     * @return 下一个ID
      */
     long nextId();
 
     /**
-     * 获取下一个ID（带业务标识）
+     * 批量获取多个ID
      *
-     * @param businessKey 业务标识
-     * @return 生成的ID
+     * @param count 要获取的ID数量
+     * @return ID数组
      */
-    long nextId(String businessKey);
+    long[] nextId(int count);
 
     /**
-     * 解析ID中的时间戳
+     * 获取ID生成器的名称
      *
-     * @param id ID
-     * @return 时间戳（毫秒）
+     * @return 生成器名称
      */
-    long parseTime(long id);
-
-    /**
-     * 解析ID中的序列号
-     *
-     * @param id ID
-     * @return 序列号
-     */
-    long parseSequence(long id);
-}
+    String getName();
+} 

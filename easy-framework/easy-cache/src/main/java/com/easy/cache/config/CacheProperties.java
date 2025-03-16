@@ -2,67 +2,90 @@ package com.easy.cache.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 缓存配置属性类，支持通过application.yml配置
+ * 缓存配置属性，用于Spring Boot配置文件中设置
  */
 @ConfigurationProperties(prefix = "easy.cache")
 public class CacheProperties {
-
+    
     /**
      * 是否启用缓存
      */
     private boolean enabled = true;
-
+    
+    /**
+     * 缓存统计信息间隔（分钟）
+     */
+    private int statIntervalMinutes = 30;
+    
+    /**
+     * 是否在缓存名称中包含区域前缀
+     */
+    private boolean areaInCacheName = false;
+    
     /**
      * 本地缓存配置
      */
-    private Local local = new Local();
-
+    private LocalCacheProperties local = new LocalCacheProperties();
+    
     /**
      * Redis缓存配置
      */
-    private Redis redis = new Redis();
-
+    private RedisCacheProperties redis = new RedisCacheProperties();
+    
     /**
      * 多级缓存配置
      */
-    private MultiLevel multiLevel = new MultiLevel();
-
+    private MultiLevelCacheProperties multiLevel = new MultiLevelCacheProperties();
+    
     /**
-     * 缓存同步配置
+     * 本地缓存配置属性
      */
-    private Sync sync = new Sync();
-
-    /**
-     * 本地缓存配置
-     */
-    public static class Local {
+    public static class LocalCacheProperties {
+        
         /**
          * 是否启用本地缓存
          */
         private boolean enabled = true;
-
+        
         /**
          * 初始容量
          */
         private int initialCapacity = 100;
-
+        
         /**
          * 最大容量
          */
-        private long maximumSize = 10000;
-
+        private int maximumSize = 10000;
+        
         /**
          * 写入后过期时间
          */
         private long expireAfterWrite = 30;
-
+        
+        /**
+         * 访问后过期时间
+         */
+        private long expireAfterAccess = 0;
+        
         /**
          * 时间单位
          */
         private TimeUnit timeUnit = TimeUnit.MINUTES;
+        
+        /**
+         * 缓存类型，默认Caffeine
+         */
+        private String type = "caffeine";
+        
+        /**
+         * 键转换器类型
+         */
+        private String keyConvertor = "fastjson2";
 
         public boolean isEnabled() {
             return enabled;
@@ -80,11 +103,11 @@ public class CacheProperties {
             this.initialCapacity = initialCapacity;
         }
 
-        public long getMaximumSize() {
+        public int getMaximumSize() {
             return maximumSize;
         }
 
-        public void setMaximumSize(long maximumSize) {
+        public void setMaximumSize(int maximumSize) {
             this.maximumSize = maximumSize;
         }
 
@@ -96,6 +119,14 @@ public class CacheProperties {
             this.expireAfterWrite = expireAfterWrite;
         }
 
+        public long getExpireAfterAccess() {
+            return expireAfterAccess;
+        }
+
+        public void setExpireAfterAccess(long expireAfterAccess) {
+            this.expireAfterAccess = expireAfterAccess;
+        }
+
         public TimeUnit getTimeUnit() {
             return timeUnit;
         }
@@ -103,71 +134,98 @@ public class CacheProperties {
         public void setTimeUnit(TimeUnit timeUnit) {
             this.timeUnit = timeUnit;
         }
-    }
 
+        public String getType() {
+            return type;
+        }
+
+        public void setType(String type) {
+            this.type = type;
+        }
+
+        public String getKeyConvertor() {
+            return keyConvertor;
+        }
+
+        public void setKeyConvertor(String keyConvertor) {
+            this.keyConvertor = keyConvertor;
+        }
+    }
+    
     /**
-     * Redis缓存配置
+     * Redis缓存配置属性
      */
-    public static class Redis {
+    public static class RedisCacheProperties {
+        
         /**
          * 是否启用Redis缓存
          */
-        private boolean enabled = false;
-
+        private boolean enabled = true;
+        
         /**
-         * Redis主机
+         * Redis服务器主机
          */
         private String host = "localhost";
-
+        
         /**
-         * Redis端口
+         * Redis服务器端口
          */
         private int port = 6379;
-
+        
         /**
          * Redis密码
          */
-        private String password = "";
-
+        private String password;
+        
         /**
-         * Redis数据库
+         * 数据库索引
          */
         private int database = 0;
-
+        
         /**
-         * 连接超时时间(毫秒)
+         * 连接超时（毫秒）
          */
         private int timeout = 2000;
-
+        
         /**
          * 最大连接数
          */
         private int maxTotal = 8;
-
+        
         /**
          * 最大空闲连接数
          */
         private int maxIdle = 8;
-
+        
         /**
          * 最小空闲连接数
          */
         private int minIdle = 0;
-
+        
         /**
-         * 序列化方式，支持JDK和JSON
+         * 序列化器类型
          */
-        private String serializer = "JSON";
-
+        private String serializer = "java";
+        
         /**
          * 写入后过期时间
          */
         private long expireAfterWrite = 1;
-
+        
         /**
          * 时间单位
          */
         private TimeUnit timeUnit = TimeUnit.HOURS;
+        
+        /**
+         * 键转换器类型
+         */
+        private String keyConvertor = "fastjson2";
+        
+        /**
+         * 广播通道名称
+         */
+        private String broadcastChannel = "easycache";
 
         public boolean isEnabled() {
             return enabled;
@@ -264,22 +322,39 @@ public class CacheProperties {
         public void setTimeUnit(TimeUnit timeUnit) {
             this.timeUnit = timeUnit;
         }
-    }
 
+        public String getKeyConvertor() {
+            return keyConvertor;
+        }
+
+        public void setKeyConvertor(String keyConvertor) {
+            this.keyConvertor = keyConvertor;
+        }
+
+        public String getBroadcastChannel() {
+            return broadcastChannel;
+        }
+
+        public void setBroadcastChannel(String broadcastChannel) {
+            this.broadcastChannel = broadcastChannel;
+        }
+    }
+    
     /**
-     * 多级缓存配置
+     * 多级缓存配置属性
      */
-    public static class MultiLevel {
+    public static class MultiLevelCacheProperties {
+        
         /**
          * 是否启用多级缓存
          */
-        private boolean enabled = false;
-
+        private boolean enabled = true;
+        
         /**
-         * 是否使用写穿透模式
+         * 是否直写模式（修改时同时写入本地和远程缓存）
          */
         private boolean writeThrough = true;
-
+        
         /**
          * 是否异步写入远程缓存
          */
@@ -310,36 +385,7 @@ public class CacheProperties {
         }
     }
 
-    /**
-     * 缓存同步配置
-     */
-    public static class Sync {
-        /**
-         * 是否启用缓存同步
-         */
-        private boolean enabled = false;
-
-        /**
-         * Redis发布/订阅通道名称
-         */
-        private String channelName = "easy:cache:sync:channel";
-
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        public String getChannelName() {
-            return channelName;
-        }
-
-        public void setChannelName(String channelName) {
-            this.channelName = channelName;
-        }
-    }
+    // Getters and Setters
 
     public boolean isEnabled() {
         return enabled;
@@ -349,35 +395,43 @@ public class CacheProperties {
         this.enabled = enabled;
     }
 
-    public Local getLocal() {
+    public int getStatIntervalMinutes() {
+        return statIntervalMinutes;
+    }
+
+    public void setStatIntervalMinutes(int statIntervalMinutes) {
+        this.statIntervalMinutes = statIntervalMinutes;
+    }
+
+    public boolean isAreaInCacheName() {
+        return areaInCacheName;
+    }
+
+    public void setAreaInCacheName(boolean areaInCacheName) {
+        this.areaInCacheName = areaInCacheName;
+    }
+
+    public LocalCacheProperties getLocal() {
         return local;
     }
 
-    public void setLocal(Local local) {
+    public void setLocal(LocalCacheProperties local) {
         this.local = local;
     }
 
-    public Redis getRedis() {
+    public RedisCacheProperties getRedis() {
         return redis;
     }
 
-    public void setRedis(Redis redis) {
+    public void setRedis(RedisCacheProperties redis) {
         this.redis = redis;
     }
 
-    public MultiLevel getMultiLevel() {
+    public MultiLevelCacheProperties getMultiLevel() {
         return multiLevel;
     }
 
-    public void setMultiLevel(MultiLevel multiLevel) {
+    public void setMultiLevel(MultiLevelCacheProperties multiLevel) {
         this.multiLevel = multiLevel;
-    }
-
-    public Sync getSync() {
-        return sync;
-    }
-
-    public void setSync(Sync sync) {
-        this.sync = sync;
     }
 } 

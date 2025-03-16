@@ -1,119 +1,157 @@
 package com.easy.id.template;
 
-import lombok.Builder;
-import lombok.Data;
+import com.easy.id.core.IdGenerator;
+import com.easy.id.exception.IdGeneratorException;
+import com.easy.id.monitor.MonitoredIdGenerator;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * ID模板定义类
- * 用于定义ID的生成格式和规则
+ * ID模板类，类似于RestTemplate，提供便捷的ID获取方法
+ *
+ * @author 芋道源码
  */
-@Data
-@Builder
+@Slf4j
 public class IdTemplate {
 
     /**
-     * 模板名称
+     * 默认的ID生成器名称
      */
-    private String name;
+    private static final String DEFAULT_GENERATOR = "default";
 
     /**
-     * 前缀
+     * ID生成器映射表
      */
-    private String prefix;
+    private final Map<String, IdGenerator> generators = new ConcurrentHashMap<>();
 
     /**
-     * 包含时间格式，如: yyyyMMdd, yyyyMM等
+     * 默认的ID生成器
      */
-    private String dateFormat;
+    private IdGenerator defaultGenerator;
 
     /**
-     * 分隔符，默认为空
+     * 构造函数
+     *
+     * @param defaultGenerator 默认ID生成器
      */
-    private String separator;
-
-    /**
-     * 序列号长度，用于左填充0
-     */
-    private int sequenceLength;
-
-    /**
-     * 最大序列号
-     */
-    private long maxSequence;
-
-    /**
-     * 是否使用雪花算法的ID，默认为false
-     */
-    private boolean useSnowflake;
-
-    /**
-     * 业务标识，用于获取号段或区分业务
-     */
-    private String businessKey;
-
-    /**
-     * 创建一个简单的模板
-     */
-    public static IdTemplate simple(String businessKey) {
-        return IdTemplate.builder()
-                .name(businessKey)
-                .businessKey(businessKey)
-                .sequenceLength(6)
-                .useSnowflake(false)
-                .build();
+    public IdTemplate(IdGenerator defaultGenerator) {
+        if (defaultGenerator != null) {
+            // 如果默认生成器未被监控，则添加监控
+            if (!(defaultGenerator instanceof MonitoredIdGenerator)) {
+                defaultGenerator = new MonitoredIdGenerator(defaultGenerator);
+            }
+            this.defaultGenerator = defaultGenerator;
+            this.generators.put(DEFAULT_GENERATOR, defaultGenerator);
+        }
     }
 
     /**
-     * 创建一个日期前缀的模板
+     * 获取下一个ID（使用默认生成器）
+     *
+     * @return ID
      */
-    public static IdTemplate datePrefix(String businessKey, String dateFormat, int sequenceLength) {
-        return IdTemplate.builder()
-                .name(businessKey)
-                .businessKey(businessKey)
-                .dateFormat(dateFormat)
-                .sequenceLength(sequenceLength)
-                .useSnowflake(false)
-                .build();
+    public long nextId() {
+        if (defaultGenerator == null) {
+            throw new IdGeneratorException("未配置默认ID生成器");
+        }
+        return defaultGenerator.nextId();
     }
 
     /**
-     * 创建一个使用雪花算法的模板
+     * 批量获取ID（使用默认生成器）
+     *
+     * @param count ID数量
+     * @return ID数组
      */
-    public static IdTemplate snowflake(String businessKey) {
-        return IdTemplate.builder()
-                .name(businessKey)
-                .businessKey(businessKey)
-                .useSnowflake(true)
-                .build();
+    public long[] nextId(int count) {
+        if (defaultGenerator == null) {
+            throw new IdGeneratorException("未配置默认ID生成器");
+        }
+        return defaultGenerator.nextId(count);
     }
 
     /**
-     * 创建一个自定义前缀的模板
+     * 使用指定生成器获取下一个ID
+     *
+     * @param generatorName 生成器名称
+     * @return ID
      */
-    public static IdTemplate withPrefix(String businessKey, String prefix, String separator) {
-        return IdTemplate.builder()
-                .name(businessKey)
-                .businessKey(businessKey)
-                .prefix(prefix)
-                .separator(separator)
-                .sequenceLength(6)
-                .useSnowflake(false)
-                .build();
+    public long nextId(String generatorName) {
+        IdGenerator generator = getGenerator(generatorName);
+        return generator.nextId();
     }
 
     /**
-     * 创建一个完整格式的模板
+     * 使用指定生成器批量获取ID
+     *
+     * @param generatorName 生成器名称
+     * @param count         ID数量
+     * @return ID数组
      */
-    public static IdTemplate full(String name, String businessKey, String prefix, String dateFormat,
-            String separator, int sequenceLength, boolean useSnowflake) {
-        return IdTemplate.builder()
-                .name(name)
-                .businessKey(businessKey)
-                .prefix(prefix)
-                .dateFormat(dateFormat)
-                .separator(separator)
-                .sequenceLength(sequenceLength)
-                .useSnowflake(useSnowflake)
-                .build();
+    public long[] nextId(String generatorName, int count) {
+        IdGenerator generator = getGenerator(generatorName);
+        return generator.nextId(count);
+    }
+
+    /**
+     * 获取指定名称的生成器
+     *
+     * @param generatorName 生成器名称
+     * @return 生成器
+     */
+    private IdGenerator getGenerator(String generatorName) {
+        IdGenerator generator = generators.get(generatorName);
+        if (generator == null) {
+            throw new IdGeneratorException("未找到名为[" + generatorName + "]的ID生成器");
+        }
+        return generator;
+    }
+
+    /**
+     * 注册ID生成器
+     *
+     * @param name      生成器名称
+     * @param generator 生成器
+     */
+    public void registerGenerator(String name, IdGenerator generator) {
+        // 如果生成器未被监控，则添加监控
+        if (!(generator instanceof MonitoredIdGenerator)) {
+            generator = new MonitoredIdGenerator(generator);
+        }
+        generators.put(name, generator);
+
+        // 如果尚未设置默认生成器，则设置为默认
+        if (defaultGenerator == null) {
+            defaultGenerator = generator;
+            generators.put(DEFAULT_GENERATOR, generator);
+        }
+
+        log.info("注册ID生成器: {}", name);
+    }
+
+    /**
+     * 设置默认生成器
+     *
+     * @param generator 生成器
+     */
+    public void setDefaultGenerator(IdGenerator generator) {
+        // 如果生成器未被监控，则添加监控
+        if (!(generator instanceof MonitoredIdGenerator)) {
+            generator = new MonitoredIdGenerator(generator);
+        }
+        this.defaultGenerator = generator;
+        this.generators.put(DEFAULT_GENERATOR, generator);
+        log.info("设置默认ID生成器: {}", generator.getName());
+    }
+
+    /**
+     * 获取所有注册的生成器
+     *
+     * @return 生成器映射表
+     */
+    public Map<String, IdGenerator> getGenerators() {
+        return new ConcurrentHashMap<>(generators);
     }
 }
