@@ -1,26 +1,30 @@
 package com.easy.lock.config;
 
+import com.easy.redis.autoconfigure.YudaoRedisAutoConfiguration;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
 import com.easy.lock.aop.LockInterceptor;
 import com.easy.lock.core.Lock;
 import com.easy.lock.core.RedisLock;
 import com.easy.lock.core.executor.RedisLockExecutor;
 import com.easy.lock.monitor.LockMonitor;
 import com.easy.lock.template.LockTemplate;
-import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Bean;
-import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
  * 分布式锁自动配置类
  */
-@AutoConfiguration
+@AutoConfiguration(after = YudaoRedisAutoConfiguration.class)
 @EnableConfigurationProperties(EasyLockProperties.class)
 @ConditionalOnProperty(prefix = "easy.lock", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnClass(StringRedisTemplate.class)
 public class EasyLockAutoConfiguration {
 
     @Bean
@@ -30,7 +34,6 @@ public class EasyLockAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnClass(StringRedisTemplate.class)
     @ConditionalOnBean(StringRedisTemplate.class)
     @ConditionalOnMissingBean(RedisLockExecutor.class)
     public RedisLockExecutor redisLockExecutor(StringRedisTemplate redisTemplate) {

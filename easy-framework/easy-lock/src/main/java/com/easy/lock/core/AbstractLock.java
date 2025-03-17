@@ -39,17 +39,22 @@ public abstract class AbstractLock implements Lock {
 
             // 如果第一次获取锁失败，则重试指定次数
             for (int i = 0; !acquired && i < retryCount; i++) {
-                log.debug("获取锁失败，进行第{}次重试，key={}", (i + 1), key);
+                log.debug("获取锁失败，进行第{}次重试，key='{}'", (i + 1), key);
                 try {
                     Thread.sleep(retryInterval);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    log.warn("获取锁过程被中断，key='{}'", key);
                     return null;
                 }
                 acquired = lockExecutor.acquire(key, value, expireTime);
             }
+            
+            if (!acquired) {
+                log.warn("获取锁失败，已重试{}次，key='{}'，重试间隔={}ms", retryCount, key, retryInterval);
+            }
         } catch (Exception e) {
-            log.error("获取锁时发生异常，key={}", key, e);
+            log.error("获取锁时发生异常，key='{}'", key, e);
             exception = e;
         }
 

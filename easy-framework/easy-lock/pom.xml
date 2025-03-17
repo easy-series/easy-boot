@@ -24,8 +24,9 @@
 
         <!-- Redis相关 -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
+            <groupId>com.easy</groupId>
+            <artifactId>easy-redis</artifactId>
+            <version>2.4.1-jdk8-SNAPSHOT</version>
         </dependency>
 
         <!-- Spring框架 -->
@@ -33,13 +34,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>
-        
+
         <!-- AOP相关 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
-        
+
         <!-- 工具类相关 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -52,6 +53,7 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

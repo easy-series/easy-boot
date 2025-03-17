@@ -1,5 +1,21 @@
 package com.easy.id.test;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.HashSet;
+import java.util.Set;
+
+import javax.sql.DataSource;
+
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
+
 import com.easy.id.core.IdGenerator;
 import com.easy.id.monitor.MonitoredIdGenerator;
 import com.easy.id.redis.RedisSegmentAllocator;
@@ -9,21 +25,6 @@ import com.easy.id.segment.dao.SegmentRange;
 import com.easy.id.snowflake.SnowflakeIdGenerator;
 import com.easy.id.template.IdTemplate;
 import com.mysql.cj.jdbc.MysqlDataSource;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.StringRedisSerializer;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.transaction.PlatformTransactionManager;
-
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * 手动测试类，用于直接测试ID生成器
@@ -37,19 +38,19 @@ public class ManualTest {
         System.out.println("====== 开始ID生成器测试 ======");
 
         // 测试雪花算法
-        // testSnowflake();
+        testSnowflake();
 
         // 测试数据库号段模式
-        // testDbSegment();
+        testDbSegment();
 
-         // 测试Redis号段模式
-         testRedisSegment();
-        //
-        // // 测试ID模板
-        // testIdTemplate();
-        //
-        // // 测试ID生成性能
-        // benchmarkPerformance();
+        // 测试Redis号段模式
+        testRedisSegment();
+
+        // 测试ID模板
+        testIdTemplate();
+
+        // 测试ID生成性能
+        benchmarkPerformance();
 
         System.out.println("====== ID生成器测试完成 ======");
     }
@@ -160,7 +161,8 @@ public class ManualTest {
             // 关闭资源
             if (allocator != null) {
                 try {
-//                    ((SegmentIdGenerator) ((MonitoredIdGenerator) allocator).getDelegate()).shutdown();
+                    // ((SegmentIdGenerator) ((MonitoredIdGenerator)
+                    // allocator).getDelegate()).shutdown();
                 } catch (Exception e) {
                     // 忽略
                 }
@@ -174,22 +176,27 @@ public class ManualTest {
     private static void testRedisSegment() {
         System.out.println("\n===== 测试Redis号段模式 =====");
 
-        LettuceConnectionFactory connectionFactory = null;
+        RedisConnectionFactory connectionFactory = null;
+        RedisTemplate<String, Object> redisTemplate = null;
+        org.redisson.api.RedissonClient redisson = null;
         try {
             System.out.println("1. 创建Redis连接");
-            // 创建Redis连接工厂
-            RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
-            config.setHostName("localhost");
-            config.setPort(6379);
-            // 如有密码
-            config.setPassword("123456");
+            // 创建Redisson配置
+            org.redisson.config.Config config = new org.redisson.config.Config();
+            config.useSingleServer()
+                    .setAddress("redis://localhost:6379")
+                    .setPassword("123456")
+                    .setDatabase(0);
 
-            connectionFactory = new LettuceConnectionFactory(config);
-            connectionFactory.afterPropertiesSet();
+            // 创建Redisson客户端
+            redisson = org.redisson.Redisson.create(config);
+
+            // 创建RedissonConnectionFactory
+            connectionFactory = new org.redisson.spring.data.connection.RedissonConnectionFactory(redisson);
 
             System.out.println("2. 创建Redis模板");
             // 创建Redis模板
-            RedisTemplate<String, Object> redisTemplate = new RedisTemplate<>();
+            redisTemplate = new RedisTemplate<>();
             redisTemplate.setConnectionFactory(connectionFactory);
             redisTemplate.setKeySerializer(new StringRedisSerializer());
             redisTemplate.setValueSerializer(new GenericJackson2JsonRedisSerializer());
@@ -250,9 +257,14 @@ public class ManualTest {
             System.err.println("测试Redis号段模式失败: " + e.getMessage());
             e.printStackTrace();
         } finally {
-            // 关闭连接工厂
-            if (connectionFactory != null) {
-                connectionFactory.destroy();
+            // 关闭资源
+            if (redisson != null) {
+                try {
+                    redisson.shutdown();
+                    System.out.println("已关闭Redisson连接");
+                } catch (Exception e) {
+                    System.err.println("关闭Redisson连接时发生错误: " + e.getMessage());
+                }
             }
         }
     }
@@ -295,23 +307,110 @@ public class ManualTest {
         // 创建雪花算法ID生成器
         IdGenerator snowflakeGenerator = new SnowflakeIdGenerator("snowflake", 1, 1);
 
-        // 创建ID模板
-        IdTemplate template = new IdTemplate(snowflakeGenerator);
+        // 创建Redis连接
+        RedisConnectionFactory connectionFactory = null;
+        RedisTemplate<String, Object> redisTemplate = null;
+        org.redisson.api.RedissonClient redisson = null;
 
-        // 使用默认生成器获取ID
-        System.out.println("使用默认生成器获取ID: " + template.nextId());
+        try {
+            // 创建Redisson配置
+            org.redisson.config.Config config = new org.redisson.config.Config();
+            config.useSingleServer()
+                    .setAddress("redis://localhost:6379")
+                    .setPassword("123456")
+                    .setDatabase(0);
 
-        // 使用指定生成器获取ID
-        System.out.println("使用snowflake生成器获取ID: " + template.nextId("snowflake"));
+            // 创建Redisson客户端
+            redisson = org.redisson.Redisson.create(config);
 
-        // 批量获取ID
-        System.out.println("批量获取3个ID:");
-        long[] batchIds = template.nextId(3);
-        for (int i = 0; i < batchIds.length; i++) {
-            System.out.println("批量ID " + (i + 1) + ": " + batchIds[i]);
+            // 创建RedissonConnectionFactory
+            connectionFactory = new org.redisson.spring.data.connection.RedissonConnectionFactory(redisson);
+
+            // 创建Redis模板
+            redisTemplate = new RedisTemplate<>();
+            redisTemplate.setConnectionFactory(connectionFactory);
+            redisTemplate.setKeySerializer(new StringRedisSerializer());
+            redisTemplate.setValueSerializer(new GenericJackson2JsonRedisSerializer());
+            redisTemplate.setHashKeySerializer(new StringRedisSerializer());
+            redisTemplate.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
+            redisTemplate.afterPropertiesSet();
+
+            // 初始化Redis测试数据
+            initRedisTestData(redisTemplate);
+
+            // 创建Redis号段分配器
+            RedisSegmentAllocator allocator = new RedisSegmentAllocator(redisTemplate, "easy:id:test:");
+
+            // 创建号段ID生成器
+            SegmentIdGenerator segmentGenerator = new SegmentIdGenerator("segment", allocator);
+
+            // 创建ID模板
+            IdTemplate template = new IdTemplate(snowflakeGenerator);
+            template.registerGenerator("snowflake", snowflakeGenerator);
+            template.registerGenerator("segment", segmentGenerator);
+
+            System.out.println("\n1. 测试基本功能");
+            // 使用默认生成器获取ID
+            System.out.println("使用默认生成器获取ID: " + template.nextId());
+
+            // 使用指定生成器获取ID
+            System.out.println("使用snowflake生成器获取ID: " + template.nextId("snowflake"));
+
+            // 批量获取ID
+            System.out.println("批量获取3个ID:");
+            long[] batchIds = template.nextId(3);
+            for (int i = 0; i < batchIds.length; i++) {
+                System.out.println("批量ID " + (i + 1) + ": " + batchIds[i]);
+            }
+
+            System.out.println("\n2. 测试业务键功能");
+            try {
+                // 尝试使用雪花算法生成器和业务键获取ID（会失败）
+                template.nextIdByBizKey("user_id");
+            } catch (Exception e) {
+                System.out.println("预期的异常: " + e.getMessage());
+            }
+
+            // 使用号段生成器和业务键获取ID
+            System.out.println("使用segment生成器和user_id业务键获取ID: " +
+                    template.nextIdByBizKey("segment", "user_id"));
+
+            // 使用号段生成器和订单业务键获取ID
+            System.out.println("使用segment生成器和order_id业务键获取ID: " +
+                    template.nextIdByBizKey("segment", "order_id"));
+
+            // 批量获取ID
+            System.out.println("使用segment生成器和product_id业务键批量获取3个ID:");
+            long[] bizKeyBatchIds = template.nextIdByBizKey("segment", "product_id", 3);
+            for (int i = 0; i < bizKeyBatchIds.length; i++) {
+                System.out.println("批量ID " + (i + 1) + ": " + bizKeyBatchIds[i]);
+            }
+
+            System.out.println("\n3. 测试设置号段生成器为默认生成器");
+            // 设置号段生成器为默认生成器
+            template.setDefaultGenerator(segmentGenerator);
+
+            // 使用默认生成器获取ID
+            System.out.println("使用默认生成器获取ID: " + template.nextId());
+
+            // 使用默认生成器和业务键获取ID
+            System.out.println("使用默认生成器和user_id业务键获取ID: " +
+                    template.nextIdByBizKey("user_id"));
+
+            System.out.println("ID模板测试完成");
+        } catch (Exception e) {
+            System.err.println("测试ID模板失败: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            // 关闭资源
+            if (redisson != null) {
+                try {
+                    redisson.shutdown();
+                } catch (Exception e) {
+                    // 忽略
+                }
+            }
         }
-
-        System.out.println("ID模板测试完成");
     }
 
     /**

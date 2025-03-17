@@ -34,7 +34,7 @@ easy:
     
     # 雪花算法配置
     snowflake:
-      enabled: false
+      enabled: true
       worker-id: 1
       data-center-id: 1
       name: snowflake

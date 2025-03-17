@@ -1,12 +1,14 @@
 package com.easy.id.template;
 
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import com.easy.id.core.IdGenerator;
 import com.easy.id.exception.IdGeneratorException;
 import com.easy.id.monitor.MonitoredIdGenerator;
-import lombok.extern.slf4j.Slf4j;
+import com.easy.id.segment.SegmentIdGenerator;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * ID模板类，类似于RestTemplate，提供便捷的ID获取方法
@@ -93,6 +95,68 @@ public class IdTemplate {
     public long[] nextId(String generatorName, int count) {
         IdGenerator generator = getGenerator(generatorName);
         return generator.nextId(count);
+    }
+
+    /**
+     * 使用指定业务键获取下一个ID
+     * 
+     * @param bizKey 业务键
+     * @return ID
+     * @throws IdGeneratorException 如果默认生成器不支持业务键
+     */
+    public long nextIdByBizKey(String bizKey) {
+        return nextIdByBizKey(DEFAULT_GENERATOR, bizKey);
+    }
+
+    /**
+     * 使用指定生成器和业务键获取下一个ID
+     * 
+     * @param generatorName 生成器名称
+     * @param bizKey        业务键
+     * @return ID
+     * @throws IdGeneratorException 如果生成器不支持业务键
+     */
+    public long nextIdByBizKey(String generatorName, String bizKey) {
+        IdGenerator generator = getGenerator(generatorName);
+
+        // 检查生成器是否支持业务键
+        if (generator instanceof SegmentIdGenerator) {
+            return ((SegmentIdGenerator) generator).nextId(bizKey);
+        } else {
+            throw new IdGeneratorException("生成器[" + generatorName + "]不支持业务键");
+        }
+    }
+
+    /**
+     * 使用指定业务键批量获取ID
+     * 
+     * @param bizKey 业务键
+     * @param count  ID数量
+     * @return ID数组
+     * @throws IdGeneratorException 如果默认生成器不支持业务键
+     */
+    public long[] nextIdByBizKey(String bizKey, int count) {
+        return nextIdByBizKey(DEFAULT_GENERATOR, bizKey, count);
+    }
+
+    /**
+     * 使用指定生成器和业务键批量获取ID
+     * 
+     * @param generatorName 生成器名称
+     * @param bizKey        业务键
+     * @param count         ID数量
+     * @return ID数组
+     * @throws IdGeneratorException 如果生成器不支持业务键
+     */
+    public long[] nextIdByBizKey(String generatorName, String bizKey, int count) {
+        IdGenerator generator = getGenerator(generatorName);
+
+        // 检查生成器是否支持业务键
+        if (generator instanceof SegmentIdGenerator) {
+            return ((SegmentIdGenerator) generator).nextId(bizKey, count);
+        } else {
+            throw new IdGeneratorException("生成器[" + generatorName + "]不支持业务键");
+        }
     }
 
     /**

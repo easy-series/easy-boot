@@ -19,6 +19,7 @@
         <module>easy-redis</module>
         <module>easy-file</module>
         <module>easy-mq</module>
+        <module>easy-mybatis</module>
     </modules>
 
     <artifactId>easy-framework</artifactId>

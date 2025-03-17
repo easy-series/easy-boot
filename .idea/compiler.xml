@@ -7,6 +7,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="easy-security" />
       </profile>
       <profile name="Annotation profile for easy-boot" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
@@ -23,8 +24,8 @@
         <module name="yudao-server" />
         <module name="easy-lock" />
         <module name="easy-common" />
-        <module name="easy-mybatis" />
         <module name="easy-file" />
+        <module name="easy-mybatis" />
         <module name="easy-web" />
         <module name="easy-mq" />
         <module name="easy-cache" />

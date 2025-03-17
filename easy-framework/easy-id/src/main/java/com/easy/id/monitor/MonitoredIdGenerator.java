@@ -1,6 +1,7 @@
 package com.easy.id.monitor;
 
 import com.easy.id.core.IdGenerator;
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -11,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
  * @author 芋道源码
  */
 @Slf4j
+@Data
 public class MonitoredIdGenerator implements IdGenerator {
 
     /**

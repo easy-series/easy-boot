@@ -9,22 +9,20 @@ import com.easy.id.segment.dao.DbSegmentAllocator;
 import com.easy.id.segment.dao.SegmentAllocator;
 import com.easy.id.snowflake.SnowflakeIdGenerator;
 import com.easy.id.template.IdTemplate;
+import com.easy.redis.autoconfigure.YudaoRedisAutoConfiguration;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.boot.autoconfigure.transaction.TransactionAutoConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
-import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
-import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
-import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
@@ -35,7 +33,7 @@ import javax.sql.DataSource;
  * @author 芋道源码
  */
 @Slf4j
-@AutoConfiguration
+@AutoConfiguration(after = {YudaoRedisAutoConfiguration.class, DataSourceAutoConfiguration.class, TransactionAutoConfiguration.class})
 @EnableConfigurationProperties(IdProperties.class)
 public class EasyIdAutoConfiguration {
 
@@ -63,11 +61,18 @@ public class EasyIdAutoConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "easy.id.segment", name = "enabled", havingValue = "true")
     @ConditionalOnMissingBean(name = "segmentIdGenerator")
+    @ConditionalOnClass({DataSource.class, PlatformTransactionManager.class})
     @ConditionalOnBean({DataSource.class, PlatformTransactionManager.class})
     public IdGenerator segmentIdGenerator(
             IdProperties properties,
-            DataSource dataSource,
-            PlatformTransactionManager transactionManager) {
+            @Autowired(required = false) DataSource dataSource,
+            @Autowired(required = false) PlatformTransactionManager transactionManager) {
+
+        // 检查依赖是否存在
+        if (dataSource == null || transactionManager == null) {
+            log.warn("初始化号段模式ID生成器失败：DataSource或PlatformTransactionManager不存在");
+            return null;
+        }
 
         IdProperties.SegmentProperties segmentProps = properties.getSegment();
         log.info("初始化号段模式ID生成器，表名: {}", segmentProps.getTableName());
@@ -88,7 +93,7 @@ public class EasyIdAutoConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "easy.id.redis-segment", name = "enabled", havingValue = "true")
     @ConditionalOnMissingBean(name = "redisSegmentIdGenerator")
-//    @ConditionalOnBean(RedisTemplate.class)
+    @ConditionalOnBean(RedisTemplate.class)
     @ConditionalOnClass(RedisTemplate.class)
     public IdGenerator redisSegmentIdGenerator(
             IdProperties properties,
@@ -130,31 +135,11 @@ public class EasyIdAutoConfiguration {
         }
 
         // 如果没有找到默认类型的生成器，使用第一个作为默认
-        if (template.getGenerators().size() > 0 && !template.getGenerators().containsKey("default")) {
+        if (!template.getGenerators().isEmpty() && !template.getGenerators().containsKey("default")) {
             template.setDefaultGenerator(generators[0]);
         }
 
         return template;
     }
 
-
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(connectionFactory);
-        template.setKeySerializer(new StringRedisSerializer());
-        template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
-        template.setHashKeySerializer(new StringRedisSerializer());
-        template.setHashValueSerializer(new GenericJackson2JsonRedisSerializer());
-        template.afterPropertiesSet();
-        return template;
-    }
-
-    @Bean
-    public RedisConnectionFactory redisConnectionFactory() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration("localhost", 6379);
-        // 如果需要密码认证，可以设置密码
-        config.setPassword("123456");
-        return new LettuceConnectionFactory(config);
-    }
 }

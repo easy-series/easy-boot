@@ -1,0 +1,25 @@
+# 测试环境配置
+spring:
+  # Redis配置
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    password: 123456
+    timeout: 10000
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1
+        max-idle: 8
+        min-idle: 0
+
+# Easy-Lock 配置
+easy:
+  lock:
+    enabled: true
+    prefix: easy:lock:test
+    expire-time: 30000
+    retry-count: 10
+    retry-interval: 200
+    monitor-enabled: true 
