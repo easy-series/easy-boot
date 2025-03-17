@@ -2,9 +2,9 @@ package com.easy.mq.redis.core.stream;
 
 import cn.hutool.core.util.TypeUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
-import cn.iocoder.yudao.framework.mq.redis.core.RedisMQTemplate;
-import cn.iocoder.yudao.framework.mq.redis.core.interceptor.RedisMessageInterceptor;
-import cn.iocoder.yudao.framework.mq.redis.core.message.AbstractRedisMessage;
+import com.easy.mq.redis.core.RedisMQTemplate;
+import com.easy.mq.redis.core.interceptor.RedisMessageInterceptor;
+import com.easy.mq.redis.core.message.AbstractRedisMessage;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -19,7 +19,6 @@ import java.util.List;
  * Redis Stream 监听器抽象类，用于实现集群消费
  *
  * @param <T> 消息类型。一定要填写噢，不然会报错
- *
  * @author 芋道源码
  */
 public abstract class AbstractRedisStreamMessageListener<T extends AbstractRedisStreamMessage>

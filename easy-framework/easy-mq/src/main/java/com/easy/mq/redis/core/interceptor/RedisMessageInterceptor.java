@@ -1,6 +1,7 @@
 package com.easy.mq.redis.core.interceptor;
 
-import cn.iocoder.yudao.framework.mq.redis.core.message.AbstractRedisMessage;
+
+import com.easy.mq.redis.core.message.AbstractRedisMessage;
 
 /**
  * {@link AbstractRedisMessage} 消息拦截器

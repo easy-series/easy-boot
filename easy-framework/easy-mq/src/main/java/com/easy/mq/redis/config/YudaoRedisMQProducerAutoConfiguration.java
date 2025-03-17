@@ -1,8 +1,8 @@
 package com.easy.mq.redis.config;
 
-import cn.iocoder.yudao.framework.mq.redis.core.RedisMQTemplate;
-import cn.iocoder.yudao.framework.mq.redis.core.interceptor.RedisMessageInterceptor;
-import cn.iocoder.yudao.framework.redis.config.YudaoRedisAutoConfiguration;
+import com.easy.mq.redis.core.RedisMQTemplate;
+import com.easy.mq.redis.core.interceptor.RedisMessageInterceptor;
+import com.easy.redis.autoconfigure.YudaoRedisAutoConfiguration;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.context.annotation.Bean;

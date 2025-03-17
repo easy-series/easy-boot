@@ -1,10 +1,10 @@
 package com.easy.mq.redis.core;
 
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
-import cn.iocoder.yudao.framework.mq.redis.core.interceptor.RedisMessageInterceptor;
-import cn.iocoder.yudao.framework.mq.redis.core.message.AbstractRedisMessage;
-import cn.iocoder.yudao.framework.mq.redis.core.pubsub.AbstractRedisChannelMessage;
-import cn.iocoder.yudao.framework.mq.redis.core.stream.AbstractRedisStreamMessage;
+import com.easy.mq.redis.core.interceptor.RedisMessageInterceptor;
+import com.easy.mq.redis.core.message.AbstractRedisMessage;
+import com.easy.mq.redis.core.pubsub.AbstractRedisChannelMessage;
+import com.easy.mq.redis.core.stream.AbstractRedisStreamMessage;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.springframework.data.redis.connection.stream.RecordId;

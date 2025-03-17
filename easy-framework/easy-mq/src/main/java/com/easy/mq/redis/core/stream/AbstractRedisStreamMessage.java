@@ -1,6 +1,6 @@
 package com.easy.mq.redis.core.stream;
 
-import cn.iocoder.yudao.framework.mq.redis.core.message.AbstractRedisMessage;
+import com.easy.mq.redis.core.message.AbstractRedisMessage;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
