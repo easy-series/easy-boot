@@ -111,6 +111,73 @@ public class RedisEventTest {
     private CacheManager cacheManager1;
     private CacheManager cacheManager2;
 
+    /**
+     * 自定义缓存管理器实现，确保所有创建的缓存实例都有正确的RedisTemplate
+     */
+    private class TestCacheManager implements CacheManager {
+        private final DefaultCacheManager delegate = new DefaultCacheManager();
+        private final RedisTemplate<String, Object> redisTemplate;
+        private final Serializer serializer;
+        private final java.util.Map<String, Cache<?, ?>> caches = new java.util.concurrent.ConcurrentHashMap<>();
+
+        public TestCacheManager(RedisTemplate<String, Object> redisTemplate, Serializer serializer) {
+            this.redisTemplate = redisTemplate;
+            this.serializer = serializer;
+        }
+
+        @Override
+        public <K, V> Cache<K, V> getCache(String name) {
+            return getCache(name, CacheConfig.builder().build());
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <K, V> Cache<K, V> getCache(String name, CacheConfig config) {
+            // 使用缓存MAP保证相同name返回相同实例
+            return (Cache<K, V>) caches.computeIfAbsent(name, k -> {
+                // 创建RedisRemoteCache，确保包含redisTemplate和serializer
+                System.out.println("创建缓存: " + name + " 配置: " + config);
+                RedisRemoteCache<K, V> cache = new RedisRemoteCache<>(
+                        name, config, redisTemplate, serializer, null, null);
+                return cache;
+            });
+        }
+
+        @Override
+        public java.util.Set<String> getCacheNames() {
+            return caches.keySet();
+        }
+
+        @Override
+        public void destroyCache(String name) {
+            Cache<?, ?> cache = caches.remove(name);
+            if (cache != null) {
+                cache.clear();
+            }
+        }
+
+        @Override
+        public void removeCache(String name) {
+            destroyCache(name);
+        }
+
+        @Override
+        public void clear() {
+            caches.values().forEach(Cache::clear);
+            caches.clear();
+        }
+
+        @Override
+        public CacheConfig getConfig() {
+            return delegate.getConfig();
+        }
+
+        @Override
+        public void setConfig(CacheConfig config) {
+            delegate.setConfig(config);
+        }
+    }
+
     @BeforeEach
     public void setUp() {
         // 创建Redisson客户端
@@ -144,8 +211,11 @@ public class RedisEventTest {
         // 创建序列化器和事件发布/订阅组件
         serializer = new JsonSerializer();
         eventPublisher = new RedisEventPublisher(redisTemplate, serializer);
-        cacheManager1 = new DefaultCacheManager();
-        cacheManager2 = new DefaultCacheManager();
+
+        // 使用自定义缓存管理器，确保正确传递RedisTemplate
+        cacheManager1 = new TestCacheManager(redisTemplate, serializer);
+        cacheManager2 = new TestCacheManager(redisTemplate, serializer);
+
         eventSubscriber = new RedisEventSubscriber(listenerContainer, serializer, cacheManager2);
 
         // 清空Redis
@@ -162,24 +232,14 @@ public class RedisEventTest {
         String cacheName = "testEventCache";
 
         // 创建第一个缓存
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        Cache<String, String> cache1 = new RedisRemoteCache(
-                cacheName,
-                config,
-                redisTemplate,
-                serializer,
-                eventPublisher,
-                null);
+        Cache<String, String> cache1 = cacheManager1.getCache(cacheName, config);
+        // 设置事件发布器
+        ((RedisRemoteCache<String, String>) cache1).setEventPublisher(eventPublisher);
 
         // 创建第二个缓存 (不同的缓存实例)
-        @SuppressWarnings({ "unchecked", "rawtypes" })
-        Cache<String, String> cache2 = new RedisRemoteCache(
-                cacheName,
-                config,
-                redisTemplate,
-                serializer,
-                null,
-                eventSubscriber);
+        Cache<String, String> cache2 = cacheManager2.getCache(cacheName, config);
+        // 设置事件订阅器
+        ((RedisRemoteCache<String, String>) cache2).setEventSubscriber(eventSubscriber);
 
         // 订阅第二个缓存的事件
         eventSubscriber.subscribe(cacheName);
@@ -242,6 +302,8 @@ public class RedisEventTest {
 
         // 获取第二个缓存管理器的缓存实例
         Cache<String, String> cache2 = cacheManager2.getCache(cacheName);
+        // 设置事件订阅器
+        ((RedisRemoteCache<String, String>) cache2).setEventSubscriber(eventSubscriber);
 
         // 手动发布更新事件
         eventPublisher.publish(cacheName, testKey, null, testValue);

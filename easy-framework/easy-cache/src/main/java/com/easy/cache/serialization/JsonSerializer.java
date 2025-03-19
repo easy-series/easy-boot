@@ -20,6 +20,11 @@ public class JsonSerializer implements Serializer {
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         objectMapper.configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL, true);
+
+        // 更多配置以提高兼容性
+        objectMapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+        objectMapper.configure(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT, true);
     }
 
     @Override
@@ -27,9 +32,20 @@ public class JsonSerializer implements Serializer {
         if (obj == null) {
             return new byte[0];
         }
+
         try {
-            return objectMapper.writeValueAsBytes(obj);
+            // 如果是字符串，直接返回字节
+            if (obj instanceof String) {
+                return ((String) obj).getBytes();
+            }
+
+            System.out.println("序列化对象: " + obj.getClass().getName());
+            byte[] bytes = objectMapper.writeValueAsBytes(obj);
+            System.out.println("序列化结果: " + new String(bytes));
+            return bytes;
         } catch (JsonProcessingException e) {
+            System.err.println("序列化对象失败: " + e.getMessage());
+            e.printStackTrace();
             throw new RuntimeException("Failed to serialize object", e);
         }
     }
@@ -41,26 +57,44 @@ public class JsonSerializer implements Serializer {
         }
 
         try {
+            String str = new String(bytes);
+            System.out.println("尝试反序列化: " + str + " 到类型: " + clazz.getName());
+
+            // 如果需要的是字符串，并且输入已经是字符串，直接返回
+            if (clazz == String.class) {
+                // 如果包含双引号，可能需要去除
+                if (str.startsWith("\"") && str.endsWith("\"")) {
+                    str = str.substring(1, str.length() - 1);
+                }
+                return (T) str;
+            }
+
             // 处理输入可能是String的情况
             if (bytes.length > 2 && bytes[0] == '"' && bytes[bytes.length - 1] == '"') {
                 // 可能是被双引号包围的JSON字符串
-                String jsonStr = new String(bytes);
-                if (jsonStr.startsWith("\"") && jsonStr.endsWith("\"")) {
+                if (str.startsWith("\"") && str.endsWith("\"")) {
                     // 去掉外层的引号，并尝试解析内部的JSON
-                    jsonStr = jsonStr.substring(1, jsonStr.length() - 1);
-                    return objectMapper.readValue(jsonStr, TypeFactory.defaultInstance().constructType(clazz));
+                    str = str.substring(1, str.length() - 1).replace("\\\"", "\"");
+                    try {
+                        return objectMapper.readValue(str, TypeFactory.defaultInstance().constructType(clazz));
+                    } catch (Exception e) {
+                        System.err.println("反序列化嵌套JSON失败: " + e.getMessage());
+                    }
                 }
             }
 
-            return objectMapper.readValue(bytes, TypeFactory.defaultInstance().constructType(clazz));
-        } catch (IOException e) {
-            // 尝试作为普通字符串处理
+            // 尝试直接反序列化
             try {
-                String str = new String(bytes);
+                return objectMapper.readValue(bytes, TypeFactory.defaultInstance().constructType(clazz));
+            } catch (Exception e) {
+                System.err.println("直接反序列化失败，尝试字符串方式: " + e.getMessage());
+                // 再次尝试字符串方式
                 return objectMapper.readValue(str, TypeFactory.defaultInstance().constructType(clazz));
-            } catch (IOException e2) {
-                throw new RuntimeException("Failed to deserialize object: " + new String(bytes), e);
             }
+        } catch (IOException e) {
+            System.err.println("反序列化失败: " + e.getMessage() + " 的内容: " + new String(bytes));
+            e.printStackTrace();
+            throw new RuntimeException("Failed to deserialize object: " + new String(bytes), e);
         }
     }
 }

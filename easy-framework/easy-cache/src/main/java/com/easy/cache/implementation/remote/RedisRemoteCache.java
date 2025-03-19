@@ -23,8 +23,8 @@ public class RedisRemoteCache<K, V> implements Cache<K, V> {
     private final CacheStats stats;
     private final RedisTemplate<String, Object> redisTemplate;
     private final Serializer serializer;
-    private final CacheEventPublisher eventPublisher;
-    private final CacheEventSubscriber eventSubscriber;
+    private CacheEventPublisher eventPublisher;
+    private CacheEventSubscriber eventSubscriber;
 
     /**
      * 构造方法
@@ -47,6 +47,24 @@ public class RedisRemoteCache<K, V> implements Cache<K, V> {
         this.redisTemplate = redisTemplate;
         this.serializer = serializer;
         this.eventPublisher = eventPublisher;
+        this.eventSubscriber = eventSubscriber;
+    }
+
+    /**
+     * 设置事件发布器
+     *
+     * @param eventPublisher 事件发布器
+     */
+    public void setEventPublisher(CacheEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
+
+    /**
+     * 设置事件订阅器
+     *
+     * @param eventSubscriber 事件订阅器
+     */
+    public void setEventSubscriber(CacheEventSubscriber eventSubscriber) {
         this.eventSubscriber = eventSubscriber;
     }
 

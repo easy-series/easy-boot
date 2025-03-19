@@ -93,6 +93,9 @@ public class RedisEventSubscriber implements CacheEventSubscriber, MessageListen
             // 从频道名称中提取缓存名称
             String cacheName = extractCacheName(channel);
 
+            System.out.println("收到Redis消息: channel=" + channel + ", cacheName=" + cacheName);
+            System.out.println("消息内容: " + new String(message.getBody(), StandardCharsets.UTF_8));
+
             // 尝试多种方式解析消息
             CacheEvent event = deserializeMessage(message.getBody(), cacheName);
 
@@ -101,6 +104,11 @@ public class RedisEventSubscriber implements CacheEventSubscriber, MessageListen
                 System.err.println("无法解析缓存事件消息: " + new String(message.getBody(), StandardCharsets.UTF_8));
                 return;
             }
+
+            System.out.println("解析成功: 事件类型=" + event.getEventType() +
+                    ", cacheName=" + event.getCacheName() +
+                    ", key=" + event.getKey() +
+                    ", value=" + event.getValue());
 
             // 处理事件
             onMessage(event);
@@ -120,35 +128,46 @@ public class RedisEventSubscriber implements CacheEventSubscriber, MessageListen
     private CacheEvent deserializeMessage(byte[] body, String cacheName) {
         // 尝试直接反序列化
         try {
+            System.out.println("尝试直接反序列化...");
             CacheEvent event = serializer.deserialize(body, CacheEvent.class);
             if (event != null && (event.getCacheName() == null || event.getCacheName().equals(cacheName))) {
                 // 如果缓存名称为空，设置为从频道提取的名称
                 if (event.getCacheName() == null) {
                     event.setCacheName(cacheName);
                 }
+                System.out.println("直接反序列化成功");
                 return event;
             }
         } catch (Exception e) {
             // 忽略异常，尝试其他反序列化方法
+            System.err.println("直接反序列化失败: " + e.getMessage());
         }
 
         // 尝试将消息转为字符串后反序列化
         try {
+            System.out.println("尝试字符串反序列化...");
             String jsonStr = new String(body, StandardCharsets.UTF_8);
+            System.out.println("JSON字符串: " + jsonStr);
+
             // 如果是被转义的JSON字符串，进行处理
             if (jsonStr.startsWith("\"") && jsonStr.endsWith("\"")) {
                 jsonStr = jsonStr.substring(1, jsonStr.length() - 1).replace("\\\"", "\"");
+                System.out.println("处理转义后的JSON: " + jsonStr);
             }
+
             CacheEvent event = objectMapper.readValue(jsonStr, CacheEvent.class);
             if (event != null && (event.getCacheName() == null || event.getCacheName().equals(cacheName))) {
                 // 如果缓存名称为空，设置为从频道提取的名称
                 if (event.getCacheName() == null) {
                     event.setCacheName(cacheName);
                 }
+                System.out.println("字符串反序列化成功");
                 return event;
             }
         } catch (Exception e) {
             // 忽略异常，返回null
+            System.err.println("字符串反序列化失败: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return null;

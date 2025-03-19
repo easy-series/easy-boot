@@ -38,7 +38,6 @@ public class MultiLevelCacheTest {
     /**
      * 是否跳过Redis测试的系统属性名
      */
-    private static final String SKIP_REDIS_TESTS_PROPERTY = "skipRedisTests";
 
     // 测试使用的缓存
     private Cache<String, String> localCache;
@@ -145,7 +144,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testReadFromLocalCache() {
         // 准备：只在本地缓存中有数据
         localCache.put("localKey", "localValue");
@@ -169,7 +167,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testReadFromRemoteCache() {
         // 准备：本地缓存miss，远程缓存hit
         if (remoteCache instanceof RedisRemoteCache) {
@@ -194,7 +191,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testReadFromNoneCache() {
         if (remoteCache instanceof RedisRemoteCache) {
             remoteCache.remove("nonExistingKey");
@@ -215,7 +211,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testWriteOperation() {
         // 写入多级缓存
         multiLevelCache.put("writeKey", "writeValue");
@@ -232,7 +227,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testWriteWithExpireTime() {
         // 写入多级缓存(带过期时间)
         multiLevelCache.put("expireKey", "expireValue", 120);
@@ -250,7 +244,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testRemoveOperation() {
         // 准备：先写入数据
         multiLevelCache.put("removeKey", "removeValue");
@@ -270,7 +263,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testClearOperation() {
         // 准备：写入多条数据
         multiLevelCache.put("key1", "value1");
@@ -293,7 +285,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testContainsKey() {
         // 准备：在本地缓存中写入数据
         localCache.put("localOnlyKey", "localValue");
@@ -320,7 +311,6 @@ public class MultiLevelCacheTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = SKIP_REDIS_TESTS_PROPERTY, matches = "false|FALSE|no|NO|", disabledReason = "Redis测试被系统属性skipRedisTests禁用")
     public void testDataConsistency() {
         // 模拟场景：先写入多级缓存，然后远程缓存更新，本地缓存没有更新
 
